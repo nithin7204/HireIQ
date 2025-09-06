@@ -63,8 +63,12 @@ const CandidateAccess: React.FC = () => {
     setMessage('');
   };
 
+  const handleCandidateUpdate = (updatedCandidate: Candidate) => {
+    setCandidate(updatedCandidate);
+  };
+
   if (candidate) {
-    return <CandidatePortal candidate={candidate} onLogout={handleLogout} />;
+    return <CandidatePortal candidate={candidate} onLogout={handleLogout} onCandidateUpdate={handleCandidateUpdate} />;
   }
 
   return (

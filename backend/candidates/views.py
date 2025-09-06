@@ -3,6 +3,7 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.parsers import MultiPartParser, FormParser
+from rest_framework.views import APIView
 from django.core.mail import send_mail
 from django.conf import settings
 from django.http import HttpResponse
@@ -22,17 +23,35 @@ class CandidateListCreateView(generics.ListCreateAPIView):
     
     def get_queryset(self):
         try:
+            user_id = str(self.request.user.id)
+            print(f"Fetching candidates for user ID: {user_id}")
+            
             # Get candidates created by the current user
-            return Candidate.objects.filter(created_by_id=str(self.request.user.id))
+            candidates = Candidate.objects.filter(created_by_id=user_id)
+            print(f"Found {len(candidates)} candidates")
+            
+            return candidates
         except Exception as e:
+            print(f"Error fetching candidates: {str(e)}")
             return []
     
     def list(self, request, *args, **kwargs):
         try:
+            print(f"List request from user: {request.user.email if request.user.is_authenticated else 'Anonymous'}")
+            
+            if not request.user.is_authenticated:
+                return Response(
+                    {'error': 'Authentication required'}, 
+                    status=status.HTTP_401_UNAUTHORIZED
+                )
+            
             queryset = self.get_queryset()
             serializer = CandidateSerializer(queryset, many=True)
+            
+            print(f"Returning {len(serializer.data)} candidates")
             return Response(serializer.data)
         except Exception as e:
+            print(f"List error: {str(e)}")
             return Response(
                 {'error': 'Failed to fetch candidates'}, 
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
@@ -115,9 +134,100 @@ def validate_candidate_id(request):
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
 
+class ResumeUploadView(APIView):
+    parser_classes = [MultiPartParser, FormParser]
+    permission_classes = []
+    
+    def post(self, request, *args, **kwargs):
+        print(f"Upload request received - Method: {request.method}")
+        print(f"Content-Type: {request.content_type}")
+        print(f"Request data keys: {list(request.data.keys()) if hasattr(request, 'data') else 'No data'}")
+        print(f"Request FILES keys: {list(request.FILES.keys()) if hasattr(request, 'FILES') else 'No FILES'}")
+        
+        candidate_id = request.data.get('candidate_id')
+        resume_file = request.FILES.get('resume')
+        
+        if not candidate_id:
+            return Response(
+                {'error': 'Candidate ID is required'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        if not resume_file:
+            return Response(
+                {'error': 'Resume file is required'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Validate file type (PDF only)
+        if not resume_file.name.lower().endswith('.pdf'):
+            return Response(
+                {'error': 'Only PDF files are allowed'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Validate file size (10MB max)
+        if resume_file.size > 10 * 1024 * 1024:
+            return Response(
+                {'error': 'File size must be less than 10MB'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        try:
+            # Get candidate
+            candidate = Candidate.objects.get(candidate_id=candidate_id, is_active=True)
+            print(f"Found candidate: {candidate.email}")
+            
+            # Read file data
+            file_data = resume_file.read()
+            print(f"File data size: {len(file_data)} bytes")
+            print(f"File name: {resume_file.name}")
+            print(f"File content type: {resume_file.content_type}")
+            
+            # Update candidate record with binary data
+            candidate.resume_filename = resume_file.name
+            candidate.resume_data = file_data
+            candidate.resume_content_type = resume_file.content_type or 'application/pdf'
+            candidate.resume_size = str(resume_file.size)
+            candidate.save()
+            print(f"Successfully saved resume for candidate: {candidate.candidate_id}")
+            
+            # Verify the save worked
+            saved_candidate = Candidate.objects.get(candidate_id=candidate_id)
+            print(f"Verification - Has resume data: {bool(saved_candidate.resume_data)}")
+            print(f"Verification - Resume size: {saved_candidate.resume_size}")
+            
+            return Response(
+                {
+                    'message': 'Resume uploaded successfully',
+                    'candidate': CandidateSerializer(candidate).data
+                }, 
+                status=status.HTTP_200_OK
+            )
+            
+        except DoesNotExist:
+            print(f"Candidate not found: {candidate_id}")
+            return Response(
+                {'error': 'Invalid candidate ID'}, 
+                status=status.HTTP_404_NOT_FOUND
+            )
+        except Exception as e:
+            print(f"Upload error: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            return Response(
+                {'error': f'Upload failed: {str(e)}'}, 
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
 @api_view(['POST'])
 @permission_classes([])
 def upload_resume(request):
+    print(f"Upload request received - Method: {request.method}")
+    print(f"Content-Type: {request.content_type}")
+    print(f"Request data keys: {list(request.data.keys()) if hasattr(request, 'data') else 'No data'}")
+    print(f"Request FILES keys: {list(request.FILES.keys()) if hasattr(request, 'FILES') else 'No FILES'}")
+    
     candidate_id = request.data.get('candidate_id')
     resume_file = request.FILES.get('resume')
     

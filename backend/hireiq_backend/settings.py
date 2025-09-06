@@ -132,7 +132,7 @@ CORS_ALLOWED_ORIGIN_REGEXES = [
     r"^https://accounts\.google\.com$",
 ]
 
-# Add headers to handle Cross-Origin-Opener-Policy
+# Add headers to handle Cross-Origin-Opener-Policy and file uploads
 CORS_ALLOW_HEADERS = [
     'accept',
     'accept-encoding',
@@ -144,7 +144,13 @@ CORS_ALLOW_HEADERS = [
     'x-csrftoken',
     'x-requested-with',
     'cross-origin-opener-policy',
+    'cache-control',
 ]
+
+# File upload settings
+FILE_UPLOAD_MAX_MEMORY_SIZE = 10 * 1024 * 1024  # 10MB
+DATA_UPLOAD_MAX_MEMORY_SIZE = 10 * 1024 * 1024  # 10MB
+FILE_UPLOAD_PERMISSIONS = 0o644
 
 # REST Framework configuration
 REST_FRAMEWORK = {

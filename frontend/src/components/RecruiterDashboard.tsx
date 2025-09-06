@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { GoogleLogin } from '@react-oauth/google';
+import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 
 // Function to get CSRF token from cookies
@@ -29,6 +30,7 @@ interface User {
 }
 
 const RecruiterDashboard: React.FC = () => {
+  const navigate = useNavigate();
   const [user, setUser] = useState<User | null>(null);
   const [candidates, setCandidates] = useState<Candidate[]>([]);
   const [newCandidateEmail, setNewCandidateEmail] = useState('');
@@ -90,6 +92,8 @@ const RecruiterDashboard: React.FC = () => {
       if (response.data.success) {
         setUser(response.data.user);
         setMessage('Successfully logged in!');
+        // Clear any previous error messages
+        setTimeout(() => setMessage(''), 3000);
       }
     } catch (error: any) {
       console.error('Login failed:', error);
@@ -104,13 +108,22 @@ const RecruiterDashboard: React.FC = () => {
   };
 
   const fetchCandidates = async () => {
+    if (!user) return;
+    
     try {
+      console.log('Fetching candidates for user:', user.email);
       const response = await axios.get(`${API_BASE_URL}/candidates/`, {
         withCredentials: true,
       });
+      console.log('Candidates response:', response.data);
       setCandidates(response.data);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to fetch candidates:', error);
+      if (error.response?.status === 401) {
+        // Session expired, redirect to login
+        setUser(null);
+        setCandidates([]);
+      }
     }
   };
 
@@ -147,10 +160,23 @@ const RecruiterDashboard: React.FC = () => {
       await axios.post(`${API_BASE_URL}/auth/logout/`, {}, {
         withCredentials: true,
       });
+      
+      // Clear local state
       setUser(null);
       setCandidates([]);
+      setMessage('');
+      setNewCandidateEmail('');
+      
+      // Redirect to home page
+      navigate('/');
     } catch (error) {
       console.error('Logout failed:', error);
+      // Even if logout fails on backend, clear frontend state and redirect
+      setUser(null);
+      setCandidates([]);
+      setMessage('');
+      setNewCandidateEmail('');
+      navigate('/');
     }
   };
 
@@ -249,7 +275,15 @@ const RecruiterDashboard: React.FC = () => {
 
         <div className="bg-white overflow-hidden shadow rounded-lg">
           <div className="px-4 py-5 sm:p-6">
-            <h2 className="text-lg font-medium text-gray-900 mb-4">Candidates</h2>
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-lg font-medium text-gray-900">Candidates</h2>
+              <button
+                onClick={fetchCandidates}
+                className="bg-gray-600 text-white px-4 py-2 rounded hover:bg-gray-700 text-sm"
+              >
+                Refresh
+              </button>
+            </div>
             {candidates.length === 0 ? (
               <p className="text-gray-500">No candidates added yet.</p>
             ) : (

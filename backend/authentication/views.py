@@ -116,8 +116,26 @@ def google_auth(request):
 
 @api_view(['POST'])
 def logout_view(request):
-    logout(request)
-    return Response({'success': True}, status=status.HTTP_200_OK)
+    try:
+        if request.user.is_authenticated:
+            print(f"Logging out user: {request.user.email}")
+        
+        logout(request)
+        
+        # Clear session data
+        if hasattr(request, 'session'):
+            request.session.flush()
+        
+        response = Response({'success': True}, status=status.HTTP_200_OK)
+        
+        # Clear any authentication cookies
+        response.delete_cookie('sessionid')
+        response.delete_cookie('csrftoken')
+        
+        return response
+    except Exception as e:
+        print(f"Logout error: {str(e)}")
+        return Response({'success': True}, status=status.HTTP_200_OK)  # Return success even if error
 
 @api_view(['GET'])
 @permission_classes([AllowAny])

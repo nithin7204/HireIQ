@@ -14,6 +14,7 @@ class Candidate(Document):
     resume_data = BinaryField()  # Store PDF binary data
     resume_content_type = StringField(max_length=100, default='application/pdf')  # MIME type
     resume_size = StringField(max_length=20)  # File size in bytes
+    resume_url = StringField(max_length=500)  # For backward compatibility with old records
     
     meta = {
         'collection': 'candidates',
