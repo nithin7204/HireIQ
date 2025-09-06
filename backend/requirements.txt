@@ -1,23 +1,72 @@
+# Core Django
 Django==5.2.6
 djangorestframework==3.16.1
 django-cors-headers==4.7.0
+
+# Database - MongoDB
 mongoengine==0.28.2
 pymongo==4.6.0
-python-dotenv==1.1.1
+dnspython==2.7.0
+
+# Authentication & OAuth
 social-auth-app-django==5.5.1
 social-auth-core==4.7.0
-dnspython==2.7.0
 google-auth==2.22.0
 google-auth-oauthlib==1.0.0
-transformers
-torch
-torchvision
-langchain
-chromadb
-sentence-transformers
-langchain_community
-langchain-community
-langchain-groq
-beautifulsoup4
-pymupdf
-pypdf
+PyJWT==2.10.1
+oauthlib==3.3.1
+requests-oauthlib==2.0.0
+python3-openid==3.2.0
+defusedxml==0.7.1
+
+# AI/ML - Core
+groq==0.31.1
+transformers==4.36.2
+sentence-transformers==2.2.2
+torch==2.8.0
+numpy==1.26.4
+scikit-learn==1.7.1
+huggingface-hub==0.34.4
+tokenizers==0.15.2
+
+# LangChain (Compatible versions)
+langchain>=0.3.0,<0.4.0
+langchain-core>=0.3.0,<0.4.0
+langchain-community>=0.3.0,<0.4.0
+langchain-text-splitters>=0.3.0,<0.4.0
+langchain-groq>=0.2.0,<0.3.0
+
+# Vector Database
+chromadb==1.0.20
+
+# PDF Processing
+pymupdf==1.23.16
+pypdf==3.17.4
+
+# Web & HTTP
+requests==2.31.0
+beautifulsoup4==4.12.2
+httpx==0.28.1
+
+# Environment & Config
+python-dotenv==1.1.1
+pytz==2025.2
+
+# Security
+cryptography==45.0.7
+bcrypt==4.3.0
+
+# Utilities
+click==8.2.1
+tqdm==4.67.1
+packaging==23.2
+pillow==11.3.0
+
+# JSON & Data Processing
+pydantic>=2.0.0,<3.0.0
+PyYAML==6.0.2
+
+# HTTP/SSL
+certifi>=2025.0.0
+urllib3>=1.26.0,<2.0.0
+charset-normalizer>=3.0.0

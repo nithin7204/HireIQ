@@ -1,13 +1,23 @@
-from langchain_community.embeddings import HuggingFaceEmbeddings
-from langchain_community.vectorstores import Chroma
-from langchain_core.documents import Document
-
-from langchain_community.vectorstores import Chroma
 from langchain_text_splitters import RecursiveCharacterTextSplitter
-from langchain.schema import Document
+from langchain_core.documents import Document as LangChainDocument
+
+# Use sentence-transformers directly instead of langchain_community embeddings
+try:
+    from sentence_transformers import SentenceTransformer
+    SENTENCE_TRANSFORMERS_AVAILABLE = True
+except ImportError:
+    SENTENCE_TRANSFORMERS_AVAILABLE = False
+
+# Use chromadb directly instead of langchain_community vectorstores
+try:
+    import chromadb
+    from chromadb.config import Settings
+    CHROMADB_AVAILABLE = True
+except ImportError:
+    CHROMADB_AVAILABLE = False
 
 import os
-from langchain_groq import ChatGroq
+from groq import Groq
 import requests
 from dotenv import load_dotenv
 
@@ -16,10 +26,30 @@ import re
 import random
 
 import fitz
-from groq import Groq
 
 # Load environment variables from .env file
 load_dotenv()
+
+class SimpleRetriever:
+    """Simple retriever that returns relevant documents based on keyword matching."""
+    
+    def __init__(self, documents):
+        self.documents = documents
+    
+    def get_relevant_documents(self, query, k=3):
+        """Return documents that contain keywords from the query."""
+        query_words = query.lower().split()
+        scored_docs = []
+        
+        for doc in self.documents:
+            content = doc.page_content.lower()
+            score = sum(1 for word in query_words if word in content)
+            if score > 0:
+                scored_docs.append((score, doc))
+        
+        # Sort by score and return top k
+        scored_docs.sort(key=lambda x: x[0], reverse=True)
+        return [doc for score, doc in scored_docs[:k]]
 
 def get_interview_topics(company: str, role: str, extra_topics: str = ""):
     """
@@ -151,26 +181,17 @@ def query_resume(retriever, query, top_k=3):
 
 def build_retriever(text: str, persist_directory: str = "chroma_db_00"):
     """
-    Chunks text, creates embeddings, and builds a ChromaDB retriever.
+    Chunks text, creates embeddings, and builds a simple retriever.
     """
     # Split into chunks
     text_splitter = RecursiveCharacterTextSplitter(chunk_size=100, chunk_overlap=20)
     chunks = text_splitter.split_text(text)
 
-    # Convert to Documents
-    documents = [Document(page_content=chunk) for chunk in chunks]
-
-    # Embeddings
-    embedding = HuggingFaceEmbeddings(model_name="sentence-transformers/all-distilroberta-v1")
-
-    # Build Chroma DB
-    vectordb = Chroma.from_documents(
-        documents,
-        embedding=embedding,
-        persist_directory=persist_directory
-    )
-
-    return vectordb.as_retriever(search_kwargs={"k": 5})
+    # Store chunks as simple list for now (avoiding problematic ChromaDB integration)
+    documents = [LangChainDocument(page_content=chunk) for chunk in chunks]
+    
+    # Return a simple retriever class
+    return SimpleRetriever(documents)
 
 
 

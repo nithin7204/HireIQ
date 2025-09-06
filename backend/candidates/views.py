@@ -346,8 +346,25 @@ def generate_interview_questions(request):
         return Response({"error": "Missing required fields."}, status=status.HTTP_400_BAD_REQUEST)
 
     try:
+        # Check if API keys are configured
+        import os
+        if not os.getenv("GROQ_API_KEY") or os.getenv("GROQ_API_KEY") == "your_groq_api_key_here":
+            return Response({
+                "error": "GROQ_API_KEY not configured. Please add your API key to the .env file.",
+                "setup_instructions": "Get your GROQ API key from https://console.groq.com/keys"
+            }, status=status.HTTP_501_NOT_IMPLEMENTED)
+        
+        if not os.getenv("PERPLEXITY_API_KEY") or os.getenv("PERPLEXITY_API_KEY") == "your_perplexity_api_key_here":
+            return Response({
+                "error": "PERPLEXITY_API_KEY not configured. Please add your API key to the .env file.",
+                "setup_instructions": "Get your Perplexity API key from https://www.perplexity.ai/settings/api"
+            }, status=status.HTTP_501_NOT_IMPLEMENTED)
+        
         from candidates.ml_models.questions import get_questions
         questions = get_questions(resume_file, HR_prompt, company, role)
         return Response({"questions": questions}, status=status.HTTP_200_OK)
     except Exception as e:
+        import traceback
+        print(f"Error generating questions: {str(e)}")
+        traceback.print_exc()
         return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
