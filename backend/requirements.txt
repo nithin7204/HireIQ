@@ -1,0 +1,12 @@
+Django==5.2.6
+djangorestframework==3.16.1
+django-cors-headers==4.7.0
+mongoengine==0.28.2
+pymongo==4.6.0
+python-dotenv==1.1.1
+social-auth-app-django==5.5.1
+social-auth-core==4.7.0
+dnspython==2.7.0
+django-rest-mongoengine==0.4.1
+google-auth==2.22.0
+google-auth-oauthlib==1.0.0
