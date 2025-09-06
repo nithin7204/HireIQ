@@ -21,9 +21,6 @@ from groq import Groq
 # Load environment variables from .env file
 load_dotenv()
 
-# Initialize Groq client with API key from environment
-client = Groq(api_key=os.getenv("GROQ_API_KEY"))
-
 def get_interview_topics(company: str, role: str, extra_topics: str = ""):
     """
     Ask Perplexity Sonar for important interview topics for a given company & role.
@@ -58,7 +55,6 @@ def get_interview_topics(company: str, role: str, extra_topics: str = ""):
         ],
         "max_tokens": 300
     }
-    }
 
     response = requests.post(url, headers=headers, json=payload)
     data = response.json()
@@ -76,6 +72,8 @@ def merge_hr_with_hot_topics(hr_prompt: str = None, hot_topics: list[str] = None
     Merge recruiter input (broad topics) with most-asked/hot topics for the role
     using Groq DeepSeek reasoning model.
     """
+    # Initialize Groq client
+    client = Groq(api_key=os.getenv("GROQ_API_KEY"))
 
     if hot_topics is None:
         hot_topics = ["Arrays", "Graphs", "Dynamic Programming", "Linked List", "Hashing"]
@@ -201,6 +199,9 @@ def generate_question(topic: str, retriever) -> str:
     Returns:
         str: The generated interview question.
     """
+    # Initialize Groq client
+    client = Groq(api_key=os.getenv("GROQ_API_KEY"))
+    
     # Retrieve relevant context from the resume based on the topic
     resume_context_docs = retriever.get_relevant_documents(topic)
     resume_context = "\n".join([doc.page_content for doc in resume_context_docs])
@@ -238,6 +239,9 @@ Instructions:
     except Exception as e:
         print(f"Error generating question for topic '{topic}': {e}")
         return f"Could not generate question for topic: {topic}"
+
+# Example usage (commented out):
+# merge_hr_with_hot_topics(HR_prompt, get_interview_topics("Microsoft", "SDE Intern"))
 
 
 def get_questions(resume_file, HR_prompt, company, role):

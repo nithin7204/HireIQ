@@ -96,9 +96,16 @@ HireIQ/
    GOOGLE_CLIENT_SECRET=your_google_client_secret
    EMAIL_HOST_USER=your_email@gmail.com
    EMAIL_HOST_PASSWORD=your_email_password
+   
+   # API Keys for ML Features
+   GROQ_API_KEY=your_groq_api_key_here
+   PERPLEXITY_API_KEY=your_perplexity_api_key_here
    ```
 
-   **Note**: For detailed MongoDB Atlas setup instructions, see `MONGODB_ATLAS_SETUP.md`
+   **Note**: 
+   - For detailed MongoDB Atlas setup instructions, see `MONGODB_ATLAS_SETUP.md`
+   - Copy `.env.example` to `.env` and fill in your actual values
+   - The API keys are required for the interview question generation features
 
 5. Run migrations:
    ```bash

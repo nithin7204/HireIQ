@@ -326,3 +326,28 @@ def download_resume(request, candidate_id):
             {'error': f'Download failed: {str(e)}'}, 
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
+
+@api_view(['POST'])
+@permission_classes([])
+def generate_interview_questions(request):
+    """
+    Expects POST data:
+    - resume: PDF file (multipart/form-data)
+    - HR_prompt: HR prompt string
+    - company: Company name
+    - role: Role name
+    """
+    resume_file = request.FILES.get("resume")
+    HR_prompt = request.data.get("HR_prompt")
+    company = request.data.get("company")
+    role = request.data.get("role")
+
+    if not all([resume_file, HR_prompt, company, role]):
+        return Response({"error": "Missing required fields."}, status=status.HTTP_400_BAD_REQUEST)
+
+    try:
+        from candidates.ml_models.questions import get_questions
+        questions = get_questions(resume_file, HR_prompt, company, role)
+        return Response({"questions": questions}, status=status.HTTP_200_OK)
+    except Exception as e:
+        return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
