@@ -487,7 +487,7 @@ def get_candidate_questions(request, candidate_id):
 def auto_generate_questions(request):
     """
     Automatically generate interview questions for a candidate when they start the interview.
-    This endpoint creates questions with AI role-playing as a Google SDE interviewer.
+    This endpoint creates questions with AI role-playing as a professional SDE interviewer.
     Expects POST data:
     - candidate_id: Candidate ID
     """
@@ -510,7 +510,7 @@ def auto_generate_questions(request):
         if candidate.interview_questions and len(candidate.interview_questions) > 0:
             return Response({
                 "questions": candidate.interview_questions,
-                "hr_instructions": candidate.hr_prompt or get_google_sde_instructions(),
+                "hr_instructions": candidate.hr_prompt or get_default_sde_instructions(),
                 "candidate": CandidateSerializer(candidate).data
             }, status=status.HTTP_200_OK)
         
@@ -529,11 +529,11 @@ def auto_generate_questions(request):
             }, status=status.HTTP_501_NOT_IMPLEMENTED)
         
         # Set up interview parameters - use stored HR prompt if available
-        company = "Google"
+        company = "TechCorp"
         role = "Software Development Engineer (SDE)"
         
-        # Use the stored HR prompt if available, otherwise fall back to default Google SDE instructions
-        hr_instructions = candidate.hr_prompt if candidate.hr_prompt and candidate.hr_prompt.strip() else get_google_sde_instructions()
+        # Use the stored HR prompt if available, otherwise fall back to default SDE instructions
+        hr_instructions = candidate.hr_prompt if candidate.hr_prompt and candidate.hr_prompt.strip() else get_default_sde_instructions()
         
         # Create a file-like object from binary data
         import io
@@ -569,12 +569,12 @@ def auto_generate_questions(request):
         traceback.print_exc()
         return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-def get_google_sde_instructions():
+def get_default_sde_instructions():
     """
-    Returns the standard Google SDE interview instructions and format.
+    Returns the standard SDE interview instructions and format.
     """
     return """
-Hello! I'm your AI interviewer for Google's Software Development Engineer position. 
+Hello! I'm your AI interviewer for the Software Development Engineer position. 
 
 INTERVIEW INSTRUCTIONS:
 • This interview will last approximately 45-60 minutes
@@ -595,7 +595,7 @@ EVALUATION CRITERIA:
 • Coding skills and technical knowledge
 • Communication and collaboration abilities
 • Leadership and impact potential
-• Cultural fit with Google's values
+• Cultural fit with our team values
 
 Remember: We're looking for your thought process, not just the right answer. Good luck!
 """

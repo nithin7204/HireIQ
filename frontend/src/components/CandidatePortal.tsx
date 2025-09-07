@@ -487,7 +487,7 @@ const CandidatePortal: React.FC<CandidatePortalProps> = ({ candidate, onLogout, 
                 )}
               </div>
               <span className={`text-sm font-medium ${candidate.has_resume ? 'text-blue-600' : 'text-gray-400'}`}>
-                {candidate.has_resume ? 'Ready for Google SDE Interview' : 'Google SDE Interview (pending resume)'}
+                {candidate.has_resume ? 'Ready for Technical Interview' : 'Technical Interview (pending resume)'}
               </span>
             </div>
           </div>
@@ -501,7 +501,7 @@ const CandidatePortal: React.FC<CandidatePortalProps> = ({ candidate, onLogout, 
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
                   <p className="text-sm text-green-800 font-medium">
-                    Perfect! Your resume is ready. Our AI interviewer will automatically generate Google SDE questions based on your background when you start the interview.
+                    Perfect! Your resume is ready. Our AI interviewer will automatically generate personalized questions based on your background when you start the interview.
                   </p>
                 </div>
               </div>
@@ -522,7 +522,7 @@ const CandidatePortal: React.FC<CandidatePortalProps> = ({ candidate, onLogout, 
                       <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
                       </svg>
-                      Start Google SDE Interview
+                      Start Technical Interview
                     </>
                   )}
                 </div>

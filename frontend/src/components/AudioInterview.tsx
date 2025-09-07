@@ -274,75 +274,7 @@ const AudioInterview: React.FC<AudioInterviewProps> = ({ candidateId, onBackToPo
   };
 
   const readInstructions = () => {
-    if (hrInstructions) {
-      const utterance = new SpeechSynthesisUtterance(hrInstructions);
-      utterance.rate = 0.9;
-      utterance.pitch = 1.0;
-      speechSynthesis.speak(utterance);
-    }
-  };
-
-  const startInterview = () => {
-    setShowInstructions(false);
-    setInstructionsRead(true);
-  };
-
-  // Instructions Screen Component
-  const InstructionsScreen = () => (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
-      {/* Header */}
-      <div className="bg-white shadow-sm border-b">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center py-4">
-            <div>
-              <h1 className="text-xl font-bold text-gray-900">Google SDE Interview</h1>
-              <p className="text-sm text-gray-600">AI-Powered Technical Interview</p>
-            </div>
-            <button
-              onClick={onBackToPortal}
-              className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md transition duration-200"
-            >
-              Exit Interview
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* Main Content */}
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Google Logo and Interviewer Card */}
-        <div className="bg-white rounded-lg shadow-sm border p-8 mb-6">
-          <div className="text-center mb-6">
-            <div className="w-20 h-20 bg-gradient-to-r from-blue-500 to-red-500 rounded-full mx-auto mb-4 flex items-center justify-center">
-              <span className="text-white font-bold text-xl">G</span>
-            </div>
-            <h2 className="text-2xl font-bold text-gray-900 mb-2">Welcome to Google</h2>
-            <p className="text-lg text-gray-600">Software Development Engineer Interview</p>
-          </div>
-
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-6 mb-6">
-            <div className="flex items-start">
-              <div className="w-12 h-12 bg-blue-500 rounded-full flex items-center justify-center mr-4 flex-shrink-0">
-                <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                </svg>
-              </div>
-              <div>
-                <h3 className="text-lg font-semibold text-blue-900 mb-2">Your AI Interviewer</h3>
-                <p className="text-blue-800">
-                  I'm an AI interviewer trained to conduct Google-style SDE interviews. 
-                  I'll be evaluating your technical skills, problem-solving approach, and cultural fit.
-                </p>
-              </div>
-            </div>
-          </div>
-
-          {/* Instructions */}
-          <div className="bg-white border rounded-lg p-6">
-            <h3 className="text-xl font-semibold text-gray-900 mb-4">Interview Instructions</h3>
-            <div className="prose max-w-none">
-              <div className="whitespace-pre-line text-gray-700 leading-relaxed">
-                {hrInstructions || `Hello! I'm your AI interviewer for Google's Software Development Engineer position.
+    const genericInstructions = `Welcome to your Technical Interview for Software Development Engineer position!
 
 INTERVIEW INSTRUCTIONS:
 • This interview will last approximately 45-60 minutes
@@ -363,7 +295,100 @@ EVALUATION CRITERIA:
 • Coding skills and technical knowledge
 • Communication and collaboration abilities
 • Leadership and impact potential
-• Cultural fit with Google's values
+• Cultural fit with our team values
+
+Remember: We're looking for your thought process, not just the right answer. Good luck!`;
+    
+    const utterance = new SpeechSynthesisUtterance(genericInstructions);
+    utterance.rate = 0.9;
+    utterance.pitch = 1.0;
+    speechSynthesis.speak(utterance);
+  };
+
+  const startInterview = () => {
+    setShowInstructions(false);
+    setInstructionsRead(true);
+  };
+
+  // Instructions Screen Component
+  const InstructionsScreen = () => (
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
+      {/* Header */}
+      <div className="bg-white shadow-sm border-b">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex justify-between items-center py-4">
+            <div>
+              <h1 className="text-xl font-bold text-gray-900">Technical Interview</h1>
+              <p className="text-sm text-gray-600">AI-Powered Technical Interview</p>
+            </div>
+            <button
+              onClick={onBackToPortal}
+              className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md transition duration-200"
+            >
+              Exit Interview
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Main Content */}
+      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Google Logo and Interviewer Card */}
+        <div className="bg-white rounded-lg shadow-sm border p-8 mb-6">
+          <div className="text-center mb-6">
+            <div className="w-20 h-20 bg-gradient-to-r from-blue-500 to-indigo-500 rounded-full mx-auto mb-4 flex items-center justify-center">
+              <svg className="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+              </svg>
+            </div>
+            <h2 className="text-2xl font-bold text-gray-900 mb-2">Technical Interview</h2>
+            <p className="text-lg text-gray-600">Software Development Engineer Position</p>
+          </div>
+
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-6 mb-6">
+            <div className="flex items-start">
+              <div className="w-12 h-12 bg-blue-500 rounded-full flex items-center justify-center mr-4 flex-shrink-0">
+                <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                </svg>
+              </div>
+              <div>
+                <h3 className="text-lg font-semibold text-blue-900 mb-2">Your AI Interviewer</h3>
+                <p className="text-blue-800">
+                  I'm an AI interviewer trained to conduct professional SDE interviews. 
+                  I'll be evaluating your technical skills, problem-solving approach, and overall fit for the role.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Instructions */}
+          <div className="bg-white border rounded-lg p-6">
+            <h3 className="text-xl font-semibold text-gray-900 mb-4">Interview Instructions</h3>
+            <div className="prose max-w-none">
+              <div className="whitespace-pre-line text-gray-700 leading-relaxed">
+                {`Welcome to your Technical Interview for Software Development Engineer position!
+
+INTERVIEW INSTRUCTIONS:
+• This interview will last approximately 45-60 minutes
+• We'll cover both technical and behavioral questions
+• For technical questions, explain your thought process clearly
+• You can ask clarifying questions if needed
+• Take your time to think through problems systematically
+• We value problem-solving approach over perfect solutions
+
+INTERVIEW STRUCTURE:
+1. Brief introduction and warm-up questions (5 minutes)
+2. Technical coding/system design questions (30-40 minutes)
+3. Behavioral questions about experience and teamwork (10-15 minutes)
+4. Questions for me about the role/team (5 minutes)
+
+EVALUATION CRITERIA:
+• Problem-solving and analytical thinking
+• Coding skills and technical knowledge
+• Communication and collaboration abilities
+• Leadership and impact potential
+• Cultural fit with our team values
 
 Remember: We're looking for your thought process, not just the right answer. Good luck!`}
               </div>
@@ -418,7 +443,7 @@ Remember: We're looking for your thought process, not just the right answer. Goo
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Preparing your Google SDE interview...</p>
+          <p className="mt-4 text-gray-600">Preparing your technical interview...</p>
         </div>
       </div>
     );
@@ -462,7 +487,7 @@ Remember: We're looking for your thought process, not just the right answer. Goo
           </div>
           <h2 className="text-3xl font-bold text-gray-900 mb-4">Interview Completed!</h2>
           <p className="text-lg text-gray-600 mb-6">
-            Thank you for completing your Google SDE interview. Your responses have been saved successfully.
+            Thank you for completing your technical interview. Your responses have been saved successfully.
           </p>
           
           <div className="bg-white rounded-lg shadow-sm border p-6 mb-6">
@@ -483,7 +508,7 @@ Remember: We're looking for your thought process, not just the right answer. Goo
             <h4 className="font-semibold text-blue-900 mb-2">What happens next?</h4>
             <p className="text-blue-800 text-sm">
               Our team will review your responses and get back to you within 3-5 business days. 
-              Thank you for your interest in joining Google!
+              Thank you for your interest in this position!
             </p>
           </div>
 
@@ -509,11 +534,13 @@ Remember: We're looking for your thought process, not just the right answer. Goo
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center py-4">
             <div className="flex items-center">
-              <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-red-500 rounded-full mr-3 flex items-center justify-center">
-                <span className="text-white font-bold text-sm">G</span>
+              <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-indigo-500 rounded-full mr-3 flex items-center justify-center">
+                <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                </svg>
               </div>
               <div>
-                <h1 className="text-xl font-bold text-gray-900">Google SDE Interview</h1>
+                <h1 className="text-xl font-bold text-gray-900">Technical Interview</h1>
                 <p className="text-sm text-gray-600">
                   Question {currentQuestionIndex + 1} of {questions.length} • AI Interviewer
                 </p>
@@ -559,7 +586,7 @@ Remember: We're looking for your thought process, not just the right answer. Goo
             </div>
             <div className="flex-1">
               <div className="flex items-center justify-between mb-2">
-                <h3 className="text-lg font-semibold text-gray-900">Google AI Interviewer</h3>
+                <h3 className="text-lg font-semibold text-gray-900">AI Interviewer</h3>
                 <div className="flex space-x-2">
                   <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
                     {currentQuestion.type || 'General'}
