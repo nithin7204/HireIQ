@@ -21,6 +21,11 @@ interface Candidate {
   email: string;
   created_at: string;
   is_active: boolean;
+  has_resume?: boolean;
+  has_questions?: boolean;
+  company?: string;
+  role?: string;
+  resume_filename?: string;
 }
 
 interface User {
@@ -180,6 +185,17 @@ const RecruiterDashboard: React.FC = () => {
     }
   };
 
+  const openQuestionModal = (candidate: Candidate) => {
+    // Questions are now automatically generated when candidate starts interview
+    setMessage('✨ Questions are automatically generated using AI when candidates start their Google SDE interview. The system creates personalized questions based on their resume and Google\'s interview standards.');
+    setTimeout(() => setMessage(''), 7000);
+  };
+
+  const downloadResume = (candidate: Candidate) => {
+    const downloadUrl = `${API_BASE_URL}/candidates/download-resume/${candidate.candidate_id}/`;
+    window.open(downloadUrl, '_blank');
+  };
+
   if (!user) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -301,7 +317,13 @@ const RecruiterDashboard: React.FC = () => {
                         Added On
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Resume
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Status
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Actions
                       </th>
                     </tr>
                   </thead>
@@ -318,6 +340,25 @@ const RecruiterDashboard: React.FC = () => {
                           {new Date(candidate.created_at).toLocaleDateString()}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
+                          {candidate.has_resume ? (
+                            <div className="flex items-center">
+                              <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">
+                                Uploaded
+                              </span>
+                              <button
+                                onClick={() => downloadResume(candidate)}
+                                className="ml-2 text-blue-600 hover:text-blue-800 text-xs"
+                              >
+                                Download
+                              </button>
+                            </div>
+                          ) : (
+                            <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-yellow-100 text-yellow-800">
+                              Pending
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
                           <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
                             candidate.is_active 
                               ? 'bg-green-100 text-green-800' 
@@ -325,6 +366,13 @@ const RecruiterDashboard: React.FC = () => {
                           }`}>
                             {candidate.is_active ? 'Active' : 'Inactive'}
                           </span>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                          <div className="flex space-x-2">
+                            <span className="text-xs text-gray-500 italic">
+                              Questions auto-generated during interview
+                            </span>
+                          </div>
                         </td>
                       </tr>
                     ))}

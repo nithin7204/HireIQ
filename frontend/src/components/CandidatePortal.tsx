@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import axios from 'axios';
+import AudioInterview from './AudioInterview';
 
 interface Candidate {
   id: number;
@@ -11,6 +12,8 @@ interface Candidate {
   resume_content_type?: string;
   resume_size?: string;
   has_resume?: boolean;
+  has_questions?: boolean;
+  interview_questions?: { [key: string]: string };
 }
 
 interface CandidatePortalProps {
@@ -25,6 +28,8 @@ const CandidatePortal: React.FC<CandidatePortalProps> = ({ candidate, onLogout, 
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [dragOver, setDragOver] = useState(false);
   const [showUploadSection, setShowUploadSection] = useState(!candidate.has_resume);
+  const [showInterview, setShowInterview] = useState(false);
+  const [checkingQuestions, setCheckingQuestions] = useState(false);
 
   const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000/api';
 
@@ -121,10 +126,41 @@ const CandidatePortal: React.FC<CandidatePortalProps> = ({ candidate, onLogout, 
     }
   };
 
-  const proceedToInterview = () => {
-    // This would navigate to the interview component/page
-    // For now, we'll show an alert - you can replace this with actual navigation
-    alert('Interview functionality will be implemented next. Your resume has been successfully uploaded and verified!');
+  const proceedToInterview = async () => {
+    setCheckingQuestions(true);
+    
+    try {
+      // Call the auto-generate questions endpoint which will create questions if they don't exist
+      const response = await axios.post(`${API_BASE_URL}/candidates/auto-generate-questions/`, {
+        candidate_id: candidate.candidate_id
+      });
+      
+      if (response.data.questions && Object.keys(response.data.questions).length > 0) {
+        // Update candidate data if it was modified
+        if (response.data.candidate) {
+          onCandidateUpdate(response.data.candidate);
+        }
+        setShowInterview(true);
+      } else {
+        alert('Unable to generate interview questions at this time. Please try again later or contact support.');
+      }
+    } catch (error: any) {
+      console.error('Error auto-generating questions:', error);
+      if (error.response?.status === 501) {
+        // API keys not configured
+        alert(error.response.data.error + '\n\n' + (error.response.data.setup_instructions || ''));
+      } else if (error.response?.status === 404) {
+        alert('Candidate record not found. Please refresh and try again.');
+      } else {
+        alert('Failed to start interview. Please try again later or contact support.');
+      }
+    } finally {
+      setCheckingQuestions(false);
+    }
+  };
+
+  const backToPortal = () => {
+    setShowInterview(false);
   };
 
   const removeSelectedFile = () => {
@@ -133,6 +169,16 @@ const CandidatePortal: React.FC<CandidatePortalProps> = ({ candidate, onLogout, 
     const fileInput = document.getElementById('resume-upload') as HTMLInputElement;
     if (fileInput) fileInput.value = '';
   };
+
+  // Show interview component if requested
+  if (showInterview) {
+    return (
+      <AudioInterview 
+        candidateId={candidate.candidate_id} 
+        onBackToPortal={backToPortal}
+      />
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -368,7 +414,7 @@ const CandidatePortal: React.FC<CandidatePortalProps> = ({ candidate, onLogout, 
                 )}
               </div>
               <span className={`text-sm font-medium ${candidate.has_resume ? 'text-blue-600' : 'text-gray-400'}`}>
-                {candidate.has_resume ? 'Ready for interview' : 'Interview (pending resume)'}
+                {candidate.has_resume ? 'Ready for Google SDE Interview' : 'Google SDE Interview (pending resume)'}
               </span>
             </div>
           </div>
@@ -382,20 +428,30 @@ const CandidatePortal: React.FC<CandidatePortalProps> = ({ candidate, onLogout, 
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
                   <p className="text-sm text-green-800 font-medium">
-                    Great! Your resume has been uploaded successfully. You're ready to proceed with the interview process.
+                    Perfect! Your resume is ready. Our AI interviewer will automatically generate Google SDE questions based on your background when you start the interview.
                   </p>
                 </div>
               </div>
               
               <button 
                 onClick={proceedToInterview}
-                className="w-full bg-green-600 text-white py-4 px-6 rounded-lg hover:bg-green-700 transition duration-200 font-medium text-lg shadow-sm"
+                disabled={checkingQuestions}
+                className="w-full bg-green-600 text-white py-4 px-6 rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition duration-200 font-medium text-lg shadow-sm"
               >
                 <div className="flex items-center justify-center">
-                  <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                  </svg>
-                  Proceed to Interview
+                  {checkingQuestions ? (
+                    <>
+                      <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
+                      Preparing Interview...
+                    </>
+                  ) : (
+                    <>
+                      <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                      </svg>
+                      Start Google SDE Interview
+                    </>
+                  )}
                 </div>
               </button>
             </div>

@@ -10,6 +10,7 @@ from django.http import HttpResponse
 from mongoengine.errors import DoesNotExist, ValidationError
 import os
 import uuid
+from datetime import datetime
 from .models import Candidate
 from .serializers import CandidateSerializer, CandidateCreateSerializer
 
@@ -368,3 +369,320 @@ def generate_interview_questions(request):
         print(f"Error generating questions: {str(e)}")
         traceback.print_exc()
         return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+@api_view(['POST'])
+@permission_classes([])
+def generate_candidate_questions(request):
+    """
+    Generate questions for a specific candidate using their uploaded resume.
+    Expects POST data:
+    - candidate_id: Candidate ID
+    - HR_prompt: HR prompt string
+    - company: Company name
+    - role: Role name
+    """
+    candidate_id = request.data.get("candidate_id")
+    HR_prompt = request.data.get("HR_prompt")
+    company = request.data.get("company")
+    role = request.data.get("role")
+
+    if not all([candidate_id, HR_prompt, company, role]):
+        return Response({"error": "Missing required fields."}, status=status.HTTP_400_BAD_REQUEST)
+
+    try:
+        # Get candidate
+        candidate = Candidate.objects.get(candidate_id=candidate_id, is_active=True)
+        
+        if not candidate.resume_data:
+            return Response(
+                {'error': 'No resume found for this candidate'}, 
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        # Check if API keys are configured
+        import os
+        if not os.getenv("GROQ_API_KEY") or os.getenv("GROQ_API_KEY") == "your_groq_api_key_here":
+            return Response({
+                "error": "GROQ_API_KEY not configured. Please add your API key to the .env file.",
+                "setup_instructions": "Get your GROQ API key from https://console.groq.com/keys"
+            }, status=status.HTTP_501_NOT_IMPLEMENTED)
+        
+        if not os.getenv("PERPLEXITY_API_KEY") or os.getenv("PERPLEXITY_API_KEY") == "your_perplexity_api_key_here":
+            return Response({
+                "error": "PERPLEXITY_API_KEY not configured. Please add your API key to the .env file.",
+                "setup_instructions": "Get your Perplexity API key from https://www.perplexity.ai/settings/api"
+            }, status=status.HTTP_501_NOT_IMPLEMENTED)
+        
+        # Create a file-like object from binary data
+        import io
+        resume_file = io.BytesIO(candidate.resume_data)
+        resume_file.name = candidate.resume_filename or f"{candidate_id}_resume.pdf"
+        
+        from candidates.ml_models.questions import get_questions
+        questions = get_questions(resume_file, HR_prompt, company, role)
+        
+        # Save questions to candidate record
+        candidate.company = company
+        candidate.role = role
+        candidate.hr_prompt = HR_prompt
+        candidate.interview_questions = questions
+        candidate.save()
+        
+        return Response({
+            "questions": questions,
+            "candidate": CandidateSerializer(candidate).data
+        }, status=status.HTTP_200_OK)
+        
+    except DoesNotExist:
+        return Response(
+            {'error': 'Invalid candidate ID'}, 
+            status=status.HTTP_404_NOT_FOUND
+        )
+    except Exception as e:
+        import traceback
+        print(f"Error generating questions: {str(e)}")
+        traceback.print_exc()
+        return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+@api_view(['GET'])
+@permission_classes([])
+def get_candidate_questions(request, candidate_id):
+    """
+    Get saved questions for a candidate.
+    """
+    try:
+        candidate = Candidate.objects.get(candidate_id=candidate_id, is_active=True)
+        
+        if not candidate.interview_questions:
+            return Response(
+                {'error': 'No questions found for this candidate'}, 
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        return Response({
+            "questions": candidate.interview_questions,
+            "candidate": CandidateSerializer(candidate).data
+        }, status=status.HTTP_200_OK)
+        
+    except DoesNotExist:
+        return Response(
+            {'error': 'Invalid candidate ID'}, 
+            status=status.HTTP_404_NOT_FOUND
+        )
+    except Exception as e:
+        return Response(
+            {'error': f'Failed to get questions: {str(e)}'}, 
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+@api_view(['POST'])
+@permission_classes([])
+def auto_generate_questions(request):
+    """
+    Automatically generate interview questions for a candidate when they start the interview.
+    This endpoint creates questions with AI role-playing as a Google SDE interviewer.
+    Expects POST data:
+    - candidate_id: Candidate ID
+    """
+    candidate_id = request.data.get("candidate_id")
+    
+    if not candidate_id:
+        return Response({"error": "Candidate ID is required."}, status=status.HTTP_400_BAD_REQUEST)
+
+    try:
+        # Get candidate
+        candidate = Candidate.objects.get(candidate_id=candidate_id, is_active=True)
+        
+        if not candidate.resume_data:
+            return Response(
+                {'error': 'No resume found for this candidate'}, 
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        # Check if questions already exist
+        if candidate.interview_questions and len(candidate.interview_questions) > 0:
+            return Response({
+                "questions": candidate.interview_questions,
+                "hr_instructions": candidate.hr_prompt or get_google_sde_instructions(),
+                "candidate": CandidateSerializer(candidate).data
+            }, status=status.HTTP_200_OK)
+        
+        # Check if API keys are configured
+        import os
+        if not os.getenv("GROQ_API_KEY") or os.getenv("GROQ_API_KEY") == "your_groq_api_key_here":
+            return Response({
+                "error": "GROQ_API_KEY not configured. Please add your API key to the .env file.",
+                "setup_instructions": "Get your GROQ API key from https://console.groq.com/keys"
+            }, status=status.HTTP_501_NOT_IMPLEMENTED)
+        
+        if not os.getenv("PERPLEXITY_API_KEY") or os.getenv("PERPLEXITY_API_KEY") == "your_perplexity_api_key_here":
+            return Response({
+                "error": "PERPLEXITY_API_KEY not configured. Please add your API key to the .env file.",
+                "setup_instructions": "Get your Perplexity API key from https://www.perplexity.ai/settings/api"
+            }, status=status.HTTP_501_NOT_IMPLEMENTED)
+        
+        # Set up Google SDE interview parameters
+        company = "Google"
+        role = "Software Development Engineer (SDE)"
+        hr_instructions = get_google_sde_instructions()
+        
+        # Create a file-like object from binary data
+        import io
+        resume_file = io.BytesIO(candidate.resume_data)
+        resume_file.name = candidate.resume_filename or f"{candidate_id}_resume.pdf"
+        
+        from candidates.ml_models.questions import get_questions
+        questions = get_questions(resume_file, hr_instructions, company, role)
+        
+        # Save questions and interview setup to candidate record
+        candidate.company = company
+        candidate.role = role
+        candidate.hr_prompt = hr_instructions
+        candidate.interview_questions = questions
+        candidate.save()
+        
+        return Response({
+            "questions": questions,
+            "hr_instructions": hr_instructions,
+            "candidate": CandidateSerializer(candidate).data
+        }, status=status.HTTP_200_OK)
+        
+    except DoesNotExist:
+        return Response(
+            {'error': 'Invalid candidate ID'}, 
+            status=status.HTTP_404_NOT_FOUND
+        )
+    except Exception as e:
+        import traceback
+        print(f"Error auto-generating questions: {str(e)}")
+        traceback.print_exc()
+        return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+def get_google_sde_instructions():
+    """
+    Returns the standard Google SDE interview instructions and format.
+    """
+    return """
+Hello! I'm your AI interviewer for Google's Software Development Engineer position. 
+
+INTERVIEW INSTRUCTIONS:
+• This interview will last approximately 45-60 minutes
+• We'll cover both technical and behavioral questions
+• For technical questions, explain your thought process clearly
+• You can ask clarifying questions if needed
+• Take your time to think through problems systematically
+• We value problem-solving approach over perfect solutions
+
+INTERVIEW STRUCTURE:
+1. Brief introduction and warm-up questions (5 minutes)
+2. Technical coding/system design questions (30-40 minutes)
+3. Behavioral questions about experience and teamwork (10-15 minutes)
+4. Questions for me about the role/team (5 minutes)
+
+EVALUATION CRITERIA:
+• Problem-solving and analytical thinking
+• Coding skills and technical knowledge
+• Communication and collaboration abilities
+• Leadership and impact potential
+• Cultural fit with Google's values
+
+Remember: We're looking for your thought process, not just the right answer. Good luck!
+"""
+
+@api_view(['POST'])
+@permission_classes([])
+def save_audio_response(request):
+    """
+    Save audio response for a candidate.
+    Expects POST data:
+    - candidate_id: Candidate ID
+    - question_id: Question identifier
+    - question_text: The question text
+    - audio_data: Base64 encoded audio data
+    - transcription: Text transcription of the audio
+    - duration: Duration of the recording in seconds
+    """
+    candidate_id = request.data.get("candidate_id")
+    question_id = request.data.get("question_id")
+    question_text = request.data.get("question_text")
+    audio_data = request.data.get("audio_data")
+    transcription = request.data.get("transcription")
+    duration = request.data.get("duration")
+
+    if not all([candidate_id, question_id, question_text, audio_data]):
+        return Response({"error": "Missing required fields."}, status=status.HTTP_400_BAD_REQUEST)
+
+    try:
+        candidate = Candidate.objects.get(candidate_id=candidate_id, is_active=True)
+        
+        # Create audio response entry
+        audio_response = {
+            "question_id": question_id,
+            "question_text": question_text,
+            "audio_data": audio_data,
+            "transcription": transcription or "",
+            "duration": duration or 0,
+            "timestamp": datetime.utcnow().isoformat()
+        }
+        
+        # Initialize audio_responses if it doesn't exist
+        if not candidate.audio_responses:
+            candidate.audio_responses = []
+        
+        # Check if response for this question already exists and update it
+        existing_index = None
+        for i, response in enumerate(candidate.audio_responses):
+            if response.get("question_id") == question_id:
+                existing_index = i
+                break
+        
+        if existing_index is not None:
+            candidate.audio_responses[existing_index] = audio_response
+        else:
+            candidate.audio_responses.append(audio_response)
+        
+        candidate.save()
+        
+        return Response({
+            "message": "Audio response saved successfully",
+            "response_count": len(candidate.audio_responses)
+        }, status=status.HTTP_200_OK)
+        
+    except DoesNotExist:
+        return Response(
+            {'error': 'Invalid candidate ID'}, 
+            status=status.HTTP_404_NOT_FOUND
+        )
+    except Exception as e:
+        import traceback
+        print(f"Error saving audio response: {str(e)}")
+        traceback.print_exc()
+        return Response(
+            {'error': f'Failed to save audio response: {str(e)}'}, 
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+@api_view(['GET'])
+@permission_classes([])
+def get_candidate_responses(request, candidate_id):
+    """
+    Get all audio responses for a candidate.
+    """
+    try:
+        candidate = Candidate.objects.get(candidate_id=candidate_id, is_active=True)
+        
+        return Response({
+            "responses": candidate.audio_responses or [],
+            "candidate": CandidateSerializer(candidate).data
+        }, status=status.HTTP_200_OK)
+        
+    except DoesNotExist:
+        return Response(
+            {'error': 'Invalid candidate ID'}, 
+            status=status.HTTP_404_NOT_FOUND
+        )
+    except Exception as e:
+        return Response(
+            {'error': f'Failed to get responses: {str(e)}'}, 
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )

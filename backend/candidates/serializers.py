@@ -13,9 +13,15 @@ class CandidateSerializer(serializers.Serializer):
     resume_content_type = serializers.CharField(read_only=True)
     resume_size = serializers.CharField(read_only=True)
     has_resume = serializers.SerializerMethodField()
+    has_questions = serializers.SerializerMethodField()
+    company = serializers.CharField(read_only=True)
+    role = serializers.CharField(read_only=True)
     
     def get_has_resume(self, obj):
         return bool(obj.resume_data)
+    
+    def get_has_questions(self, obj):
+        return bool(obj.interview_questions)
 
     def create(self, validated_data):
         # Add the user ID from request context
@@ -45,6 +51,9 @@ class CandidateSerializer(serializers.Serializer):
             'resume_content_type': instance.resume_content_type,
             'resume_size': instance.resume_size,
             'has_resume': bool(instance.resume_data),
+            'has_questions': bool(instance.interview_questions),
+            'company': instance.company,
+            'role': instance.role,
         }
 
 class CandidateCreateSerializer(serializers.Serializer):

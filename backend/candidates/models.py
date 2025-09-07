@@ -1,4 +1,4 @@
-from mongoengine import Document, StringField, EmailField, ReferenceField, DateTimeField, BooleanField, BinaryField
+from mongoengine import Document, StringField, EmailField, ReferenceField, DateTimeField, BooleanField, BinaryField, DictField, ListField
 import uuid
 from datetime import datetime
 from django.contrib.auth.models import User
@@ -15,6 +15,15 @@ class Candidate(Document):
     resume_content_type = StringField(max_length=100, default='application/pdf')  # MIME type
     resume_size = StringField(max_length=20)  # File size in bytes
     resume_url = StringField(max_length=500)  # For backward compatibility with old records
+    
+    # Interview fields
+    company = StringField(max_length=255)
+    role = StringField(max_length=255)
+    hr_prompt = StringField()
+    interview_questions = DictField()  # Store generated questions
+    
+    # Audio responses
+    audio_responses = ListField(DictField())  # Store audio responses with metadata
     
     meta = {
         'collection': 'candidates',
@@ -48,3 +57,11 @@ class Candidate(Document):
             return cls.objects.get(candidate_id=candidate_id)
         except cls.DoesNotExist:
             return None
+    
+    @property
+    def has_resume(self):
+        return bool(self.resume_data)
+    
+    @property
+    def has_questions(self):
+        return bool(self.interview_questions)
