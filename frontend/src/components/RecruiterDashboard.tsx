@@ -29,6 +29,7 @@ interface Candidate {
   interview_score?: number | null;
   evaluation_score?: string;
   evaluation_rating?: string;
+  audio_responses_count?: number;
 }
 
 interface User {
@@ -66,6 +67,41 @@ const RecruiterDashboard: React.FC = () => {
   useEffect(() => {
     if (user) {
       fetchCandidates();
+      
+      // Set up auto-refresh and auto-evaluation for candidates with completed interviews
+      const autoRefreshInterval = setInterval(async () => {
+        // Fetch current candidates to check if any need evaluation updates
+        try {
+          const response = await axios.get(`${API_BASE_URL}/candidates/`, {
+            withCredentials: true,
+          });
+          const currentCandidates = response.data;
+          
+          // Check for candidates that have completed interviews but don't have scores
+          const candidatesNeedingEvaluation = currentCandidates.filter((c: any) => 
+            c.has_questions && 
+            c.audio_responses_count > 0 && 
+            !c.interview_score
+          );
+          
+          // Automatically trigger evaluation for candidates that need it
+          for (const candidate of candidatesNeedingEvaluation) {
+            try {
+              console.log(`Auto-triggering evaluation for candidate: ${candidate.candidate_id}`);
+              await triggerCandidateEvaluation(candidate.candidate_id);
+            } catch (error) {
+              console.error(`Failed to auto-evaluate candidate ${candidate.candidate_id}:`, error);
+            }
+          }
+          
+          // Update candidates list
+          setCandidates(currentCandidates);
+        } catch (error) {
+          console.error('Auto-refresh failed:', error);
+        }
+      }, 30000); // Check every 30 seconds for evaluation updates
+      
+      return () => clearInterval(autoRefreshInterval);
     }
   }, [user]);
 
@@ -125,33 +161,7 @@ const RecruiterDashboard: React.FC = () => {
       });
       console.log('Candidates response:', response.data);
       
-      // For candidates with interview responses but no evaluation, fetch evaluation
-      const candidatesWithUpdatedScores = await Promise.all(
-        response.data.map(async (candidate: Candidate) => {
-          // Check if candidate has questions but no evaluation score and has audio responses
-          if (candidate.has_questions && !candidate.interview_score) {
-            try {
-              // Try to fetch evaluation for this candidate
-              const evalResponse = await axios.post(`${API_BASE_URL}/candidates/fetch-evaluation/`, {
-                candidate_id: candidate.candidate_id
-              }, {
-                withCredentials: true,
-              });
-              
-              if (evalResponse.data.success) {
-                // Return updated candidate data
-                return evalResponse.data.candidate;
-              }
-            } catch (evalError: any) {
-              // If evaluation fails, just continue with original candidate data
-              console.log(`Could not fetch evaluation for candidate ${candidate.candidate_id}:`, evalError.response?.data?.error);
-            }
-          }
-          return candidate;
-        })
-      );
-      
-      setCandidates(candidatesWithUpdatedScores);
+      setCandidates(response.data);
     } catch (error: any) {
       console.error('Failed to fetch candidates:', error);
       if (error.response?.status === 401) {
@@ -159,6 +169,29 @@ const RecruiterDashboard: React.FC = () => {
         setUser(null);
         setCandidates([]);
       }
+    }
+  };
+
+  const triggerCandidateEvaluation = async (candidateId: string) => {
+    try {
+      console.log(`Triggering evaluation for candidate: ${candidateId}`);
+      const response = await axios.post(`${API_BASE_URL}/candidates/manual-evaluate/`, {
+        candidate_id: candidateId,
+      }, {
+        withCredentials: true,
+        headers: {
+          'Content-Type': 'application/json',
+        }
+      });
+      
+      if (response.data.success) {
+        console.log(`Evaluation completed for candidate: ${candidateId}`);
+        // Refresh candidates to show updated scores
+        await fetchCandidates();
+      }
+    } catch (error: any) {
+      console.error(`Failed to evaluate candidate ${candidateId}:`, error);
+      // Don't throw error - just log it so auto-evaluation doesn't stop
     }
   };
 
@@ -218,35 +251,6 @@ const RecruiterDashboard: React.FC = () => {
   const downloadResume = (candidate: Candidate) => {
     const downloadUrl = `${API_BASE_URL}/candidates/download-resume/${candidate.candidate_id}/`;
     window.open(downloadUrl, '_blank');
-  };
-
-  const refreshEvaluation = async (candidate: Candidate) => {
-    if (!candidate.has_questions) {
-      setMessage('Candidate has not completed the interview yet.');
-      return;
-    }
-
-    try {
-      setLoading(true);
-      const response = await axios.post(`${API_BASE_URL}/candidates/fetch-evaluation/`, {
-        candidate_id: candidate.candidate_id
-      }, {
-        withCredentials: true,
-      });
-
-      if (response.data.success) {
-        // Update the candidate in the list
-        setCandidates(candidates.map(c => 
-          c.candidate_id === candidate.candidate_id ? response.data.candidate : c
-        ));
-        setMessage(`Evaluation updated for ${candidate.email}. Score: ${response.data.evaluation_summary.average_score}/10`);
-      }
-    } catch (error: any) {
-      console.error('Failed to refresh evaluation:', error);
-      setMessage(error.response?.data?.error || 'Failed to refresh evaluation');
-    } finally {
-      setLoading(false);
-    }
   };
 
   if (!user) {
@@ -356,16 +360,49 @@ const RecruiterDashboard: React.FC = () => {
                 <button
                   onClick={async () => {
                     setLoading(true);
-                    setMessage('Checking all candidates for new evaluations...');
+                    setMessage('Refreshing candidate data...');
                     await fetchCandidates();
                     setLoading(false);
-                    setMessage('All candidates updated!');
+                    setMessage('Candidate data refreshed!');
                     setTimeout(() => setMessage(''), 3000);
                   }}
                   disabled={loading}
                   className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 text-sm disabled:opacity-50"
                 >
-                  {loading ? 'Updating...' : 'Update Scores'}
+                  {loading ? 'Refreshing...' : 'Refresh Data'}
+                </button>
+                
+                <button
+                  onClick={async () => {
+                    setLoading(true);
+                    setMessage('Updating evaluation scores...');
+                    
+                    // Find candidates that need evaluation
+                    const candidatesNeedingEvaluation = candidates.filter(c => 
+                      c.has_questions && 
+                      c.audio_responses_count && 
+                      c.audio_responses_count > 0
+                    );
+                    
+                    console.log(`Updating scores for ${candidatesNeedingEvaluation.length} candidates`);
+                    
+                    // Trigger evaluation for each candidate
+                    for (const candidate of candidatesNeedingEvaluation) {
+                      try {
+                        await triggerCandidateEvaluation(candidate.candidate_id);
+                      } catch (error) {
+                        console.error(`Failed to evaluate ${candidate.candidate_id}:`, error);
+                      }
+                    }
+                    
+                    setLoading(false);
+                    setMessage('Score updates completed!');
+                    setTimeout(() => setMessage(''), 3000);
+                  }}
+                  disabled={loading}
+                  className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 text-sm disabled:opacity-50"
+                >
+                  {loading ? 'Updating Scores...' : 'Update All Scores'}
                 </button>
               </div>
             </div>
@@ -468,19 +505,19 @@ const RecruiterDashboard: React.FC = () => {
                                   </span>
                                 )}
                               </>
-                            ) : candidate.has_questions ? (
+                            ) : candidate.has_questions && candidate.audio_responses_count && candidate.audio_responses_count > 0 ? (
                               <div className="flex items-center space-x-2">
                                 <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">
                                   Interview Completed
                                 </span>
-                                <button
-                                  onClick={() => refreshEvaluation(candidate)}
-                                  disabled={loading}
-                                  className="text-xs text-blue-600 hover:text-blue-800 underline disabled:opacity-50"
-                                >
-                                  Get Score
-                                </button>
+                                <span className="inline-flex px-2 py-1 text-xs font-medium rounded-full bg-yellow-100 text-yellow-800">
+                                  Evaluating...
+                                </span>
                               </div>
+                            ) : candidate.has_questions ? (
+                              <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">
+                                Interview In Progress
+                              </span>
                             ) : (
                               <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-gray-100 text-gray-600">
                                 Not Started
@@ -490,20 +527,37 @@ const RecruiterDashboard: React.FC = () => {
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                           <div className="flex space-x-2">
-                            {candidate.has_questions && !candidate.interview_score && (
+                            {candidate.has_resume ? (
                               <button
-                                onClick={() => refreshEvaluation(candidate)}
-                                disabled={loading}
-                                className="text-xs bg-blue-600 text-white px-2 py-1 rounded hover:bg-blue-700 disabled:opacity-50"
+                                onClick={() => downloadResume(candidate)}
+                                className="text-xs bg-blue-600 text-white px-2 py-1 rounded hover:bg-blue-700"
                               >
-                                {loading ? 'Evaluating...' : 'Evaluate'}
+                                Download Resume
+                              </button>
+                            ) : (
+                              <span className="text-xs text-gray-500">No resume uploaded</span>
+                            )}
+                            
+                            {/* Add evaluation button for candidates with completed interviews but no scores */}
+                            {candidate.has_questions && 
+                             candidate.audio_responses_count && 
+                             candidate.audio_responses_count > 0 && 
+                             (!candidate.interview_score || candidate.interview_score === null) && (
+                              <button
+                                onClick={() => triggerCandidateEvaluation(candidate.candidate_id)}
+                                className="text-xs bg-green-600 text-white px-2 py-1 rounded hover:bg-green-700"
+                                title="Get evaluation score for this candidate"
+                              >
+                                Get Score
                               </button>
                             )}
-                            {candidate.interview_score && (
+                            
+                            {/* Add refresh button for candidates with existing scores */}
+                            {candidate.interview_score && candidate.interview_score > 0 && (
                               <button
-                                onClick={() => refreshEvaluation(candidate)}
-                                disabled={loading}
-                                className="text-xs bg-gray-600 text-white px-2 py-1 rounded hover:bg-gray-700 disabled:opacity-50"
+                                onClick={() => triggerCandidateEvaluation(candidate.candidate_id)}
+                                className="text-xs bg-gray-600 text-white px-2 py-1 rounded hover:bg-gray-700"
+                                title="Refresh evaluation score"
                               >
                                 Refresh
                               </button>

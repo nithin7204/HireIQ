@@ -169,6 +169,30 @@ const AudioInterview: React.FC<AudioInterviewProps> = ({ candidateId, onBackToPo
     setIsSubmitting(true);
 
     try {
+      // First, transcribe the audio
+      let transcription = '';
+      try {
+        const formData = new FormData();
+        formData.append('audio', audioBlob, 'response.wav');
+        formData.append('service', 'gemini'); // Use Gemini transcription service
+        
+        console.log('Transcribing audio...');
+        const transcriptionResponse = await axios.post(`${API_BASE_URL}/candidates/transcribe-audio/`, formData, {
+          headers: {
+            'Content-Type': 'multipart/form-data',
+          },
+        });
+        
+        if (transcriptionResponse.data.transcription) {
+          transcription = transcriptionResponse.data.transcription;
+          console.log('Transcription successful:', transcription.substring(0, 100) + '...');
+        }
+      } catch (transcriptionError) {
+        console.warn('Transcription failed, saving without transcription:', transcriptionError);
+        // Continue saving even if transcription fails
+      }
+
+      // Then save the response with transcription
       const audioBase64 = await blobToBase64(audioBlob);
       
       const responseData = {
@@ -176,7 +200,7 @@ const AudioInterview: React.FC<AudioInterviewProps> = ({ candidateId, onBackToPo
         question_id: currentQuestion.id,
         question_text: currentQuestion.text,
         audio_data: audioBase64,
-        transcription: '', // You can add speech-to-text here later
+        transcription: transcription, // Now includes actual transcription
         duration: recordingTime
       };
 
@@ -654,7 +678,7 @@ Remember: We're looking for your thought process, not just the right answer. Goo
                 {isSubmitting ? (
                   <>
                     <div className="inline-block animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-3"></div>
-                    Saving Response...
+                    Transcribing & Saving...
                   </>
                 ) : (
                   <>

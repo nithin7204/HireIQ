@@ -49,6 +49,11 @@ class CandidateListCreateView(generics.ListCreateAPIView):
                 )
             
             queryset = self.get_queryset()
+            
+            # Check each candidate for auto-evaluation opportunities
+            for candidate in queryset:
+                check_and_auto_evaluate(candidate)
+            
             serializer = CandidateSerializer(queryset, many=True)
             
             print(f"Returning {len(serializer.data)} candidates")
@@ -591,6 +596,163 @@ EVALUATION CRITERIA:
 Remember: We're looking for your thought process, not just the right answer. Good luck!
 """
 
+def check_and_auto_evaluate(candidate):
+    """
+    Check if the candidate has completed the interview and automatically trigger evaluation if needed.
+    Returns True if interview is completed, False otherwise.
+    """
+    try:
+        # Check if candidate has interview questions
+        if not candidate.interview_questions:
+            return False
+        
+        # Get the number of questions from interview_questions
+        total_questions = len(candidate.interview_questions)
+        
+        # Get the number of audio responses
+        response_count = len(candidate.audio_responses) if candidate.audio_responses else 0
+        
+        # Check if all questions have been answered
+        interview_completed = response_count >= total_questions
+        
+        # If interview is completed and no evaluation score exists, trigger auto-evaluation
+        if interview_completed and not candidate.evaluation_score:
+            try:
+                # Trigger evaluation in the background
+                from threading import Thread
+                thread = Thread(target=auto_evaluate_candidate, args=(candidate.candidate_id,))
+                thread.daemon = True
+                thread.start()
+                print(f"Auto-evaluation triggered for candidate {candidate.candidate_id}")
+            except Exception as e:
+                print(f"Failed to trigger auto-evaluation for candidate {candidate.candidate_id}: {str(e)}")
+        
+        return interview_completed
+        
+    except Exception as e:
+        print(f"Error in check_and_auto_evaluate: {str(e)}")
+        return False
+
+def auto_evaluate_candidate(candidate_id):
+    """
+    Background function to automatically evaluate a candidate.
+    """
+    try:
+        from .ml_models.evaluate import evaluate_candidate_answer as eval_function
+        from .gridfs_models import get_resume_content
+        from datetime import datetime
+        
+        # Get candidate
+        candidate = Candidate.objects.get(candidate_id=candidate_id)
+        
+        # Get resume content
+        resume_content = get_resume_content(candidate_id)
+        if not resume_content:
+            print(f"No resume found for candidate {candidate_id} - skipping auto-evaluation")
+            return
+        
+        # Prepare evaluations from audio responses
+        evaluations = []
+        if candidate.audio_responses and candidate.interview_questions:
+            # Convert interview_questions dict to list for easier processing
+            questions_list = list(candidate.interview_questions.items())
+            
+            for response in candidate.audio_responses:
+                question_text = response.get('question_text', '')
+                transcription = response.get('transcription', '')
+                
+                if question_text and transcription:
+                    evaluations.append({
+                        'question': question_text,
+                        'answer': transcription
+                    })
+        
+        if not evaluations:
+            print(f"No valid question-answer pairs found for candidate {candidate_id}")
+            # Create mock evaluation based on completion if candidate has audio responses
+            if candidate.audio_responses and len(candidate.audio_responses) > 0:
+                completion_score = min(len(candidate.audio_responses) * 2, 10)  # 2 points per response, max 10
+                rating = 'Good' if completion_score >= 6 else 'Average' if completion_score >= 4 else 'Needs Improvement'
+                
+                candidate.evaluation_score = str(completion_score)
+                candidate.evaluation_rating = rating
+                candidate.evaluation_data = {
+                    'total_questions': len(candidate.audio_responses),
+                    'successful_evaluations': 0,
+                    'failed_evaluations': len(candidate.audio_responses),
+                    'average_score': completion_score,
+                    'overall_rating': rating,
+                    'auto_generated': True,
+                    'evaluation_type': 'completion_based',
+                    'evaluation_timestamp': datetime.utcnow().isoformat(),
+                    'note': 'Evaluation based on interview completion - transcriptions not available'
+                }
+                candidate.evaluation_timestamp = datetime.utcnow()
+                candidate.save()
+                print(f"Mock evaluation completed for candidate {candidate_id}: {completion_score}/10 ({rating})")
+            return
+        
+        # Process evaluations
+        total_score = 0
+        successful_evaluations = 0
+        evaluation_results = []
+        
+        for evaluation in evaluations:
+            question = evaluation['question']
+            answer = evaluation['answer']
+            
+            try:
+                evaluation_result = eval_function(question, answer, resume_content)
+                
+                if not evaluation_result.get('error'):
+                    total_score += evaluation_result.get('overall_score', 0)
+                    successful_evaluations += 1
+                    evaluation_results.append(evaluation_result)
+                else:
+                    print(f"Evaluation error for candidate {candidate_id}: {evaluation_result.get('message', 'Unknown error')}")
+                
+            except Exception as e:
+                print(f"Failed to evaluate question for candidate {candidate_id}: {str(e)}")
+        
+        # Calculate and save results if we have successful evaluations
+        if successful_evaluations > 0:
+            average_score = total_score / successful_evaluations
+            
+            # Determine rating based on average score
+            if average_score >= 8:
+                rating = 'Excellent'
+            elif average_score >= 6:
+                rating = 'Good'
+            elif average_score >= 4:
+                rating = 'Average'
+            else:
+                rating = 'Needs Improvement'
+            
+            # Update candidate with evaluation results
+            candidate.evaluation_score = str(round(average_score, 1))
+            candidate.evaluation_rating = rating
+            candidate.evaluation_data = {
+                'total_questions': len(evaluations),
+                'successful_evaluations': successful_evaluations,
+                'failed_evaluations': len(evaluations) - successful_evaluations,
+                'average_score': round(average_score, 2),
+                'overall_rating': rating,
+                'evaluation_results': evaluation_results,
+                'auto_generated': True,
+                'evaluation_timestamp': datetime.utcnow().isoformat()
+            }
+            candidate.evaluation_timestamp = datetime.utcnow()
+            candidate.save()
+            
+            print(f"Auto-evaluation completed for candidate {candidate_id}: {average_score:.1f}/10 ({rating})")
+        else:
+            print(f"No successful evaluations for candidate {candidate_id}")
+            
+    except Exception as e:
+        print(f"Error in auto_evaluate_candidate for {candidate_id}: {str(e)}")
+        import traceback
+        traceback.print_exc()
+
 @api_view(['POST'])
 @permission_classes([])
 def save_audio_response(request):
@@ -645,9 +807,14 @@ def save_audio_response(request):
         
         candidate.save()
         
+        # Check if interview is completed and automatically trigger evaluation
+        interview_completed = check_and_auto_evaluate(candidate)
+        
         return Response({
             "message": "Audio response saved successfully",
-            "response_count": len(candidate.audio_responses)
+            "response_count": len(candidate.audio_responses),
+            "interview_completed": interview_completed,
+            "auto_evaluation_triggered": interview_completed and not candidate.evaluation_score
         }, status=status.HTTP_200_OK)
         
     except DoesNotExist:
@@ -1111,6 +1278,197 @@ def fetch_candidate_evaluation(request):
         
     except Exception as e:
         print(f"Unexpected error in fetch_candidate_evaluation: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return Response(
+            {'error': f'Server error: {str(e)}'}, 
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def manual_evaluate_candidate(request):
+    """
+    Manually trigger evaluation for a candidate.
+    
+    Expects POST data:
+    - candidate_id: ID of the candidate (required)
+    
+    Returns:
+    - evaluation_summary: Overall evaluation summary with scores and rating
+    """
+    try:
+        from .gridfs_models import get_resume_content
+        from .ml_models.evaluate import evaluate_candidate_answer as eval_function
+        from datetime import datetime
+        
+        # Get request data
+        data = request.data
+        candidate_id = data.get('candidate_id', '').strip()
+        
+        # Validate required fields
+        if not candidate_id:
+            return Response(
+                {'error': 'Candidate ID is required'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        try:
+            candidate = Candidate.objects.get(candidate_id=candidate_id, is_active=True)
+            
+            # Check if candidate belongs to the current user
+            if candidate.created_by_id != str(request.user.id):
+                return Response(
+                    {'error': 'You can only evaluate your own candidates'}, 
+                    status=status.HTTP_403_FORBIDDEN
+                )
+                
+        except DoesNotExist:
+            return Response(
+                {'error': 'Invalid candidate ID'}, 
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        # Check if candidate has audio responses
+        if not candidate.audio_responses:
+            return Response(
+                {'error': 'No interview responses found for this candidate'}, 
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        # Get candidate resume
+        try:
+            resume_content = get_resume_content(candidate_id)
+            if not resume_content:
+                return Response(
+                    {'error': 'Resume not found for this candidate'}, 
+                    status=status.HTTP_404_NOT_FOUND
+                )
+        except Exception as e:
+            return Response(
+                {'error': 'Could not retrieve candidate resume'}, 
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        # Check for valid transcriptions first
+        valid_transcriptions = []
+        for response in candidate.audio_responses:
+            question = response.get('question_text', '').strip()
+            transcription = response.get('transcription', '').strip()
+            
+            if question and transcription:
+                valid_transcriptions.append({
+                    'question': question,
+                    'answer': transcription
+                })
+        
+        # If no valid transcriptions, provide mock evaluation based on completion
+        if not valid_transcriptions:
+            # Create a mock evaluation based on completion
+            completion_score = min(len(candidate.audio_responses) * 2, 10)  # 2 points per response, max 10
+            rating = 'Good' if completion_score >= 6 else 'Average' if completion_score >= 4 else 'Needs Improvement'
+            
+            summary = {
+                'total_questions': len(candidate.audio_responses),
+                'successful_evaluations': 0,
+                'failed_evaluations': len(candidate.audio_responses),
+                'average_score': completion_score,
+                'overall_rating': rating,
+                'note': 'Evaluation based on interview completion - transcriptions not available'
+            }
+            
+            # Save mock evaluation
+            candidate.evaluation_score = str(completion_score)
+            candidate.evaluation_rating = rating
+            candidate.evaluation_data = {
+                'summary': summary,
+                'evaluated_at': datetime.utcnow().isoformat(),
+                'evaluation_type': 'completion_based'
+            }
+            candidate.evaluation_timestamp = datetime.utcnow()
+            candidate.save()
+            
+            return Response({
+                'success': True,
+                'candidate_id': candidate_id,
+                'evaluation_summary': summary,
+                'candidate': CandidateSerializer(candidate).data,
+                'message': 'Evaluation completed based on interview participation'
+            }, status=status.HTTP_200_OK)
+        
+        # Process evaluations with valid transcriptions
+        results = []
+        total_score = 0
+        successful_evaluations = 0
+        
+        for idx, evaluation in enumerate(valid_transcriptions):
+            question = evaluation['question']
+            answer = evaluation['answer']
+            
+            try:
+                evaluation_result = eval_function(question, answer, resume_content)
+                
+                if not evaluation_result.get('error'):
+                    total_score += evaluation_result.get('overall_score', 0)
+                    successful_evaluations += 1
+                
+                results.append({
+                    'index': idx,
+                    'question': question[:100] + '...' if len(question) > 100 else question,
+                    'evaluation': evaluation_result
+                })
+                
+            except Exception as e:
+                results.append({
+                    'index': idx,
+                    'error': f'Evaluation failed: {str(e)}',
+                    'question': question[:50] + '...' if len(question) > 50 else question
+                })
+        
+        # Calculate summary
+        average_score = total_score / successful_evaluations if successful_evaluations > 0 else 0
+        
+        # Determine rating based on average score
+        if average_score >= 8:
+            overall_rating = 'Excellent'
+        elif average_score >= 6:
+            overall_rating = 'Good'
+        elif average_score >= 4:
+            overall_rating = 'Average'
+        else:
+            overall_rating = 'Needs Improvement'
+        
+        summary = {
+            'total_questions': len(candidate.audio_responses),
+            'transcribed_questions': len(valid_transcriptions),
+            'successful_evaluations': successful_evaluations,
+            'failed_evaluations': len(valid_transcriptions) - successful_evaluations,
+            'average_score': round(average_score, 2),
+            'overall_rating': overall_rating
+        }
+        
+        # Save evaluation results to candidate
+        candidate.evaluation_score = str(round(average_score, 2))
+        candidate.evaluation_rating = overall_rating
+        candidate.evaluation_data = {
+            'summary': summary,
+            'results': results,
+            'evaluated_at': datetime.utcnow().isoformat(),
+            'evaluation_type': 'ai_based'
+        }
+        candidate.evaluation_timestamp = datetime.utcnow()
+        candidate.save()
+        
+        return Response({
+            'success': True,
+            'candidate_id': candidate_id,
+            'evaluation_summary': summary,
+            'candidate': CandidateSerializer(candidate).data
+        }, status=status.HTTP_200_OK)
+        
+    except Exception as e:
+        print(f"Unexpected error in manual_evaluate_candidate: {str(e)}")
         import traceback
         traceback.print_exc()
         return Response(

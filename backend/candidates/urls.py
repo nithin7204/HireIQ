@@ -14,7 +14,8 @@ from .views import (
     transcribe_audio_view,
     evaluate_candidate_answer,
     batch_evaluate_answers,
-    fetch_candidate_evaluation
+    fetch_candidate_evaluation,
+    manual_evaluate_candidate
 )
 
 urlpatterns = [
@@ -32,4 +33,5 @@ urlpatterns = [
     path('evaluate-answer/', evaluate_candidate_answer, name='evaluate-candidate-answer'),
     path('batch-evaluate/', batch_evaluate_answers, name='batch-evaluate-answers'),
     path('fetch-evaluation/', fetch_candidate_evaluation, name='fetch-candidate-evaluation'),
+    path('manual-evaluate/', manual_evaluate_candidate, name='manual-evaluate-candidate'),
 ]

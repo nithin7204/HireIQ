@@ -19,15 +19,21 @@ class CandidateSerializer(serializers.Serializer):
     evaluation_score = serializers.CharField(read_only=True)
     evaluation_rating = serializers.CharField(read_only=True)
     interview_score = serializers.SerializerMethodField()
+    audio_responses_count = serializers.SerializerMethodField()
     
     def get_interview_score(self, obj):
         """Convert evaluation_score to integer for compatibility"""
         if obj.evaluation_score:
             try:
-                return float(obj.evaluation_score) * 10  # Convert to 100-point scale
+                score = float(obj.evaluation_score)
+                return score * 10  # Convert to 100-point scale
             except (ValueError, TypeError):
                 return None
         return None
+    
+    def get_audio_responses_count(self, obj):
+        """Return the number of audio responses"""
+        return len(obj.audio_responses) if obj.audio_responses else 0
     
     def get_has_resume(self, obj):
         return bool(obj.resume_data)
@@ -69,13 +75,15 @@ class CandidateSerializer(serializers.Serializer):
             'evaluation_score': instance.evaluation_score,
             'evaluation_rating': instance.evaluation_rating,
             'interview_score': self._get_interview_score_value(instance),
+            'audio_responses_count': len(instance.audio_responses) if instance.audio_responses else 0,
         }
     
     def _get_interview_score_value(self, instance):
         """Helper method to safely convert evaluation_score to interview_score"""
         if instance.evaluation_score:
             try:
-                return float(instance.evaluation_score) * 10  # Convert to 100-point scale
+                score = float(instance.evaluation_score)
+                return score * 10  # Convert to 100-point scale
             except (ValueError, TypeError):
                 return None
         return None

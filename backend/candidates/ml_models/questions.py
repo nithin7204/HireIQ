@@ -30,26 +30,31 @@ import fitz
 # Load environment variables from .env file
 load_dotenv()
 
-class SimpleRetriever:
-    """Simple retriever that returns relevant documents based on keyword matching."""
+class ChromaRetriever:
+    """ChromaDB retriever with sentence transformers for semantic search."""
     
-    def __init__(self, documents):
-        self.documents = documents
+    def __init__(self, collection, embedding_model):
+        self.collection = collection
+        self.embedding_model = embedding_model
     
     def get_relevant_documents(self, query, k=3):
-        """Return documents that contain keywords from the query."""
-        query_words = query.lower().split()
-        scored_docs = []
+        """Return documents that are semantically similar to the query."""
+        # Encode the query using sentence transformers
+        query_embedding = self.embedding_model.encode([query]).tolist()
         
-        for doc in self.documents:
-            content = doc.page_content.lower()
-            score = sum(1 for word in query_words if word in content)
-            if score > 0:
-                scored_docs.append((score, doc))
+        # Query ChromaDB for similar documents
+        results = self.collection.query(
+            query_embeddings=query_embedding,
+            n_results=k
+        )
         
-        # Sort by score and return top k
-        scored_docs.sort(key=lambda x: x[0], reverse=True)
-        return [doc for score, doc in scored_docs[:k]]
+        # Convert results back to LangChain document format
+        documents = []
+        if results['documents'] and len(results['documents']) > 0:
+            for doc_text in results['documents'][0]:
+                documents.append(LangChainDocument(page_content=doc_text))
+        
+        return documents
 
 def get_interview_topics(company: str, role: str, extra_topics: str = ""):
     """
@@ -163,7 +168,7 @@ Your task:
                 return {"raw_output": reply}
         return {"raw_output": reply}
 
-  # PyMuPDF for PDF parsing
+# PyMuPDF for PDF parsing
 
 def parse_resume(file_obj) -> str:
     # file_obj: Django InMemoryUploadedFile or similar
@@ -175,23 +180,67 @@ def parse_resume(file_obj) -> str:
 
     
 def query_resume(retriever, query, top_k=3):
-    docs = retriever.get_relevant_documents(query)
+    """Query the resume using ChromaDB semantic search."""
+    docs = retriever.get_relevant_documents(query, k=top_k)
     return [doc.page_content for doc in docs]
 
 
 def build_retriever(text: str, persist_directory: str = "chroma_db_00"):
     """
-    Chunks text, creates embeddings, and builds a simple retriever.
+    Chunks text, creates embeddings using sentence transformers, and builds a ChromaDB retriever.
     """
-    # Split into chunks
-    text_splitter = RecursiveCharacterTextSplitter(chunk_size=100, chunk_overlap=20)
-    chunks = text_splitter.split_text(text)
-
-    # Store chunks as simple list for now (avoiding problematic ChromaDB integration)
-    documents = [LangChainDocument(page_content=chunk) for chunk in chunks]
+    if not CHROMADB_AVAILABLE:
+        raise ImportError("chromadb is required but not available. Please install with: pip install chromadb")
     
-    # Return a simple retriever class
-    return SimpleRetriever(documents)
+    if not SENTENCE_TRANSFORMERS_AVAILABLE:
+        raise ImportError("sentence-transformers is required but not available. Please install with: pip install sentence-transformers")
+    
+    # Initialize the sentence transformer model
+    embedding_model = SentenceTransformer('all-MiniLM-L6-v2')
+    
+    # Split into chunks
+    text_splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=50)
+    chunks = text_splitter.split_text(text)
+    
+    # Initialize ChromaDB client
+    chroma_client = chromadb.Client(Settings(
+        persist_directory=persist_directory,
+        anonymized_telemetry=False
+    ))
+    
+    # Create or get collection
+    collection_name = "resume_collection"
+    try:
+        # Try to get existing collection
+        collection = chroma_client.get_collection(name=collection_name)
+        # Delete existing collection to avoid duplicates
+        chroma_client.delete_collection(name=collection_name)
+    except:
+        pass  # Collection doesn't exist, which is fine
+    
+    # Create new collection
+    collection = chroma_client.create_collection(
+        name=collection_name,
+        metadata={"description": "Resume text chunks for interview question generation"}
+    )
+    
+    # Generate embeddings and add to collection
+    if chunks:
+        # Generate embeddings for all chunks
+        embeddings = embedding_model.encode(chunks).tolist()
+        
+        # Create unique IDs for each chunk
+        ids = [f"chunk_{i}" for i in range(len(chunks))]
+        
+        # Add documents to collection
+        collection.add(
+            documents=chunks,
+            embeddings=embeddings,
+            ids=ids
+        )
+    
+    # Return ChromaDB retriever
+    return ChromaRetriever(collection, embedding_model)
 
 
 
@@ -215,7 +264,7 @@ def generate_question(topic: str, retriever) -> str:
 
     Args:
         topic (str): The technical topic for the question.
-        retriever: The ChromaDB retriever object to get resume context.
+        retriever: The ChromaDB retriever object to get resume context using semantic search.
 
     Returns:
         str: The generated interview question.
