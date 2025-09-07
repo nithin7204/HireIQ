@@ -6,14 +6,19 @@ A full-stack web application that allows recruiters to manage candidates and pro
 
 ### Recruiter Portal
 - Google OAuth authentication for recruiters
-- Add candidate emails to the system
+- Add candidate emails to the system with **custom HR instructions**
+- **AI-powered question generation** based on recruiter-specific requirements
 - Automatic generation of unique candidate IDs
 - Email notifications sent to candidates with their IDs
 - Dashboard to view and manage all candidates
+- **Interview customization** through HR prompt instructions
 
 ### Candidate Portal
 - Simple ID-based access system
 - Candidates enter their unique ID to access the interview portal
+- **Personalized interview questions** generated based on recruiter's HR instructions
+- Resume upload and AI-powered question generation
+- Audio response recording and transcription
 - Validation against the database
 - Access granted only for valid, active candidate IDs
 
@@ -174,8 +179,16 @@ For detailed step-by-step instructions, see `MONGODB_ATLAS_SETUP.md`
 2. Navigate to `http://localhost:3000`
 3. Choose "I'm a Recruiter" to access the recruiter portal
 4. Sign in with Google
-5. Add candidate emails - they will receive unique IDs via email
-6. Candidates can use "I'm a Candidate" and enter their ID to access the portal
+5. Add candidate emails with optional **HR Instructions**:
+   - Enter candidate email address
+   - Provide custom HR instructions to guide the AI interviewer
+   - Examples: "Focus on React and TypeScript", "Emphasize system design", "Test problem-solving for startup environment"
+6. Candidates receive unique IDs via email
+7. Candidates use "I'm a Candidate" portal to:
+   - Enter their unique ID
+   - Upload resume
+   - Complete AI interview with questions tailored to recruiter's instructions
+8. Recruiters can view interview results and scores in the dashboard
 
 ## API Endpoints
 

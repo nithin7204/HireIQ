@@ -25,6 +25,7 @@ interface Candidate {
   has_questions?: boolean;
   company?: string;
   role?: string;
+  hr_prompt?: string;
   resume_filename?: string;
   interview_score?: number | null;
   evaluation_score?: string;
@@ -43,6 +44,7 @@ const RecruiterDashboard: React.FC = () => {
   const [user, setUser] = useState<User | null>(null);
   const [candidates, setCandidates] = useState<Candidate[]>([]);
   const [newCandidateEmail, setNewCandidateEmail] = useState('');
+  const [hrPrompt, setHrPrompt] = useState('');
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
 
@@ -204,6 +206,7 @@ const RecruiterDashboard: React.FC = () => {
       const csrfToken = getCsrfToken();
       const response = await axios.post(`${API_BASE_URL}/candidates/`, {
         email: newCandidateEmail,
+        hr_prompt: hrPrompt.trim() || undefined,
       }, {
         withCredentials: true,
         headers: {
@@ -214,6 +217,7 @@ const RecruiterDashboard: React.FC = () => {
 
       setCandidates([response.data, ...candidates]);
       setNewCandidateEmail('');
+      setHrPrompt('');
       setMessage('Candidate added successfully! Email sent.');
     } catch (error: any) {
       console.error('Failed to add candidate:', error);
@@ -234,6 +238,7 @@ const RecruiterDashboard: React.FC = () => {
       setCandidates([]);
       setMessage('');
       setNewCandidateEmail('');
+      setHrPrompt('');
       
       // Redirect to home page
       navigate('/');
@@ -244,6 +249,7 @@ const RecruiterDashboard: React.FC = () => {
       setCandidates([]);
       setMessage('');
       setNewCandidateEmail('');
+      setHrPrompt('');
       navigate('/');
     }
   };
@@ -326,22 +332,40 @@ const RecruiterDashboard: React.FC = () => {
         <div className="bg-white overflow-hidden shadow rounded-lg mb-6">
           <div className="px-4 py-5 sm:p-6">
             <h2 className="text-lg font-medium text-gray-900 mb-4">Add New Candidate</h2>
-            <form onSubmit={addCandidate} className="flex space-x-4">
-              <input
-                type="email"
-                value={newCandidateEmail}
-                onChange={(e) => setNewCandidateEmail(e.target.value)}
-                placeholder="Enter candidate email"
-                className="flex-1 border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
-                required
-              />
-              <button
-                type="submit"
-                disabled={loading}
-                className="bg-blue-600 text-white px-6 py-2 rounded hover:bg-blue-700 disabled:opacity-50"
-              >
-                {loading ? 'Adding...' : 'Add Candidate'}
-              </button>
+            <form onSubmit={addCandidate} className="space-y-4">
+              <div className="flex space-x-4">
+                <input
+                  type="email"
+                  value={newCandidateEmail}
+                  onChange={(e) => setNewCandidateEmail(e.target.value)}
+                  placeholder="Enter candidate email"
+                  className="flex-1 border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
+                  required
+                />
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="bg-blue-600 text-white px-6 py-2 rounded hover:bg-blue-700 disabled:opacity-50"
+                >
+                  {loading ? 'Adding...' : 'Add Candidate'}
+                </button>
+              </div>
+              <div>
+                <label htmlFor="hrPrompt" className="block text-sm font-medium text-gray-700 mb-2">
+                  HR Instructions (Optional)
+                </label>
+                <textarea
+                  id="hrPrompt"
+                  value={hrPrompt}
+                  onChange={(e) => setHrPrompt(e.target.value)}
+                  placeholder="Enter specific instructions for the interviewer AI (e.g., focus areas, skills to assess, company-specific requirements)"
+                  rows={3}
+                  className="w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
+                />
+                <p className="mt-1 text-xs text-gray-500">
+                  These instructions will guide the AI interviewer to generate targeted questions for this candidate.
+                </p>
+              </div>
             </form>
           </div>
         </div>

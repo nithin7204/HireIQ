@@ -16,6 +16,7 @@ class CandidateSerializer(serializers.Serializer):
     has_questions = serializers.SerializerMethodField()
     company = serializers.CharField(read_only=True)
     role = serializers.CharField(read_only=True)
+    hr_prompt = serializers.CharField(read_only=True)
     evaluation_score = serializers.CharField(read_only=True)
     evaluation_rating = serializers.CharField(read_only=True)
     interview_score = serializers.SerializerMethodField()
@@ -72,6 +73,7 @@ class CandidateSerializer(serializers.Serializer):
             'has_questions': bool(instance.interview_questions),
             'company': instance.company,
             'role': instance.role,
+            'hr_prompt': instance.hr_prompt,
             'evaluation_score': instance.evaluation_score,
             'evaluation_rating': instance.evaluation_rating,
             'interview_score': self._get_interview_score_value(instance),
@@ -90,6 +92,7 @@ class CandidateSerializer(serializers.Serializer):
 
 class CandidateCreateSerializer(serializers.Serializer):
     email = serializers.EmailField()
+    hr_prompt = serializers.CharField(required=False, allow_blank=True)
 
     def create(self, validated_data):
         validated_data['created_by_id'] = str(self.context['request'].user.id)

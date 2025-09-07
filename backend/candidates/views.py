@@ -528,10 +528,12 @@ def auto_generate_questions(request):
                 "setup_instructions": "Get your Perplexity API key from https://www.perplexity.ai/settings/api"
             }, status=status.HTTP_501_NOT_IMPLEMENTED)
         
-        # Set up Google SDE interview parameters
+        # Set up interview parameters - use stored HR prompt if available
         company = "Google"
         role = "Software Development Engineer (SDE)"
-        hr_instructions = get_google_sde_instructions()
+        
+        # Use the stored HR prompt if available, otherwise fall back to default Google SDE instructions
+        hr_instructions = candidate.hr_prompt if candidate.hr_prompt and candidate.hr_prompt.strip() else get_google_sde_instructions()
         
         # Create a file-like object from binary data
         import io
@@ -544,7 +546,9 @@ def auto_generate_questions(request):
         # Save questions and interview setup to candidate record
         candidate.company = company
         candidate.role = role
-        candidate.hr_prompt = hr_instructions
+        # Only update hr_prompt if it wasn't already set during candidate creation
+        if not candidate.hr_prompt or not candidate.hr_prompt.strip():
+            candidate.hr_prompt = hr_instructions
         candidate.interview_questions = questions
         candidate.save()
         
