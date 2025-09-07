@@ -5,6 +5,7 @@ interface Question {
   id: string;
   text: string;
   topic: string;
+  type?: string;
 }
 
 interface AudioInterviewProps {
@@ -59,17 +60,31 @@ const AudioInterview: React.FC<AudioInterviewProps> = ({ candidateId, onBackToPo
         setHrInstructions(response.data.hr_instructions || response.data.candidate.hr_prompt);
       }
       
-      // Convert the questions object to an array with proper structure
+      // Convert the new nested questions structure to an array
       const questionsData = response.data.questions;
       const questionArray: Question[] = [];
+      let questionIndex = 0;
       
-      Object.entries(questionsData).forEach(([topic, questionText], index) => {
-        questionArray.push({
-          id: `q_${index}`,
-          text: questionText as string,
-          topic: topic
-        });
+      console.log('Received questions data:', questionsData);
+      
+      // Handle the new nested structure with categories
+      Object.entries(questionsData).forEach(([category, categoryQuestions]) => {
+        console.log(`Processing category: ${category}`, categoryQuestions);
+        if (Array.isArray(categoryQuestions)) {
+          categoryQuestions.forEach((questionObj: any) => {
+            console.log('Processing question:', questionObj);
+            questionArray.push({
+              id: `q_${questionIndex}`,
+              text: questionObj.question,
+              topic: questionObj.topic || category,
+              type: questionObj.type || category
+            });
+            questionIndex++;
+          });
+        }
       });
+      
+      console.log('Final question array:', questionArray);
       
       setQuestions(questionArray);
       setError('');
@@ -545,9 +560,14 @@ Remember: We're looking for your thought process, not just the right answer. Goo
             <div className="flex-1">
               <div className="flex items-center justify-between mb-2">
                 <h3 className="text-lg font-semibold text-gray-900">Google AI Interviewer</h3>
-                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                  Topic: {currentQuestion.topic}
-                </span>
+                <div className="flex space-x-2">
+                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                    {currentQuestion.type || 'General'}
+                  </span>
+                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                    {currentQuestion.topic}
+                  </span>
+                </div>
               </div>
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                 <p className="text-gray-800 leading-relaxed text-lg">
