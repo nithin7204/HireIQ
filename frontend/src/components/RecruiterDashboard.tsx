@@ -26,6 +26,9 @@ interface Candidate {
   company?: string;
   role?: string;
   resume_filename?: string;
+  interview_score?: number | null;
+  evaluation_score?: string;
+  evaluation_rating?: string;
 }
 
 interface User {
@@ -121,7 +124,34 @@ const RecruiterDashboard: React.FC = () => {
         withCredentials: true,
       });
       console.log('Candidates response:', response.data);
-      setCandidates(response.data);
+      
+      // For candidates with interview responses but no evaluation, fetch evaluation
+      const candidatesWithUpdatedScores = await Promise.all(
+        response.data.map(async (candidate: Candidate) => {
+          // Check if candidate has questions but no evaluation score and has audio responses
+          if (candidate.has_questions && !candidate.interview_score) {
+            try {
+              // Try to fetch evaluation for this candidate
+              const evalResponse = await axios.post(`${API_BASE_URL}/candidates/fetch-evaluation/`, {
+                candidate_id: candidate.candidate_id
+              }, {
+                withCredentials: true,
+              });
+              
+              if (evalResponse.data.success) {
+                // Return updated candidate data
+                return evalResponse.data.candidate;
+              }
+            } catch (evalError: any) {
+              // If evaluation fails, just continue with original candidate data
+              console.log(`Could not fetch evaluation for candidate ${candidate.candidate_id}:`, evalError.response?.data?.error);
+            }
+          }
+          return candidate;
+        })
+      );
+      
+      setCandidates(candidatesWithUpdatedScores);
     } catch (error: any) {
       console.error('Failed to fetch candidates:', error);
       if (error.response?.status === 401) {
@@ -185,15 +215,38 @@ const RecruiterDashboard: React.FC = () => {
     }
   };
 
-  const openQuestionModal = (candidate: Candidate) => {
-    // Questions are now automatically generated when candidate starts interview
-    setMessage('✨ Questions are automatically generated using AI when candidates start their Google SDE interview. The system creates personalized questions based on their resume and Google\'s interview standards.');
-    setTimeout(() => setMessage(''), 7000);
-  };
-
   const downloadResume = (candidate: Candidate) => {
     const downloadUrl = `${API_BASE_URL}/candidates/download-resume/${candidate.candidate_id}/`;
     window.open(downloadUrl, '_blank');
+  };
+
+  const refreshEvaluation = async (candidate: Candidate) => {
+    if (!candidate.has_questions) {
+      setMessage('Candidate has not completed the interview yet.');
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const response = await axios.post(`${API_BASE_URL}/candidates/fetch-evaluation/`, {
+        candidate_id: candidate.candidate_id
+      }, {
+        withCredentials: true,
+      });
+
+      if (response.data.success) {
+        // Update the candidate in the list
+        setCandidates(candidates.map(c => 
+          c.candidate_id === candidate.candidate_id ? response.data.candidate : c
+        ));
+        setMessage(`Evaluation updated for ${candidate.email}. Score: ${response.data.evaluation_summary.average_score}/10`);
+      }
+    } catch (error: any) {
+      console.error('Failed to refresh evaluation:', error);
+      setMessage(error.response?.data?.error || 'Failed to refresh evaluation');
+    } finally {
+      setLoading(false);
+    }
   };
 
   if (!user) {
@@ -293,12 +346,28 @@ const RecruiterDashboard: React.FC = () => {
           <div className="px-4 py-5 sm:p-6">
             <div className="flex justify-between items-center mb-4">
               <h2 className="text-lg font-medium text-gray-900">Candidates</h2>
-              <button
-                onClick={fetchCandidates}
-                className="bg-gray-600 text-white px-4 py-2 rounded hover:bg-gray-700 text-sm"
-              >
-                Refresh
-              </button>
+              <div className="flex space-x-2">
+                <button
+                  onClick={fetchCandidates}
+                  className="bg-gray-600 text-white px-4 py-2 rounded hover:bg-gray-700 text-sm"
+                >
+                  Refresh
+                </button>
+                <button
+                  onClick={async () => {
+                    setLoading(true);
+                    setMessage('Checking all candidates for new evaluations...');
+                    await fetchCandidates();
+                    setLoading(false);
+                    setMessage('All candidates updated!');
+                    setTimeout(() => setMessage(''), 3000);
+                  }}
+                  disabled={loading}
+                  className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 text-sm disabled:opacity-50"
+                >
+                  {loading ? 'Updating...' : 'Update Scores'}
+                </button>
+              </div>
             </div>
             {candidates.length === 0 ? (
               <p className="text-gray-500">No candidates added yet.</p>
@@ -321,6 +390,9 @@ const RecruiterDashboard: React.FC = () => {
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Status
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Interview Score & Rating
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Actions
@@ -367,11 +439,75 @@ const RecruiterDashboard: React.FC = () => {
                             {candidate.is_active ? 'Active' : 'Inactive'}
                           </span>
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                          <div className="flex flex-col space-y-1">
+                            {candidate.interview_score !== null && candidate.interview_score !== undefined ? (
+                              <>
+                                <div className="flex items-center space-x-2">
+                                  <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                                    candidate.interview_score >= 80 ? 'bg-green-100 text-green-800' :
+                                    candidate.interview_score >= 60 ? 'bg-yellow-100 text-yellow-800' :
+                                    'bg-red-100 text-red-800'
+                                  }`}>
+                                    {Math.round(candidate.interview_score)}/100
+                                  </span>
+                                  {candidate.evaluation_rating && (
+                                    <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${
+                                      candidate.evaluation_rating === 'Excellent' ? 'bg-green-50 text-green-700 border border-green-200' :
+                                      candidate.evaluation_rating === 'Good' ? 'bg-blue-50 text-blue-700 border border-blue-200' :
+                                      candidate.evaluation_rating === 'Average' ? 'bg-yellow-50 text-yellow-700 border border-yellow-200' :
+                                      'bg-red-50 text-red-700 border border-red-200'
+                                    }`}>
+                                      {candidate.evaluation_rating}
+                                    </span>
+                                  )}
+                                </div>
+                                {candidate.evaluation_score && (
+                                  <span className="text-xs text-gray-500">
+                                    Raw: {candidate.evaluation_score}/10
+                                  </span>
+                                )}
+                              </>
+                            ) : candidate.has_questions ? (
+                              <div className="flex items-center space-x-2">
+                                <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">
+                                  Interview Completed
+                                </span>
+                                <button
+                                  onClick={() => refreshEvaluation(candidate)}
+                                  disabled={loading}
+                                  className="text-xs text-blue-600 hover:text-blue-800 underline disabled:opacity-50"
+                                >
+                                  Get Score
+                                </button>
+                              </div>
+                            ) : (
+                              <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-gray-100 text-gray-600">
+                                Not Started
+                              </span>
+                            )}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                           <div className="flex space-x-2">
-                            <span className="text-xs text-gray-500 italic">
-                              Questions auto-generated during interview
-                            </span>
+                            {candidate.has_questions && !candidate.interview_score && (
+                              <button
+                                onClick={() => refreshEvaluation(candidate)}
+                                disabled={loading}
+                                className="text-xs bg-blue-600 text-white px-2 py-1 rounded hover:bg-blue-700 disabled:opacity-50"
+                              >
+                                {loading ? 'Evaluating...' : 'Evaluate'}
+                              </button>
+                            )}
+                            {candidate.interview_score && (
+                              <button
+                                onClick={() => refreshEvaluation(candidate)}
+                                disabled={loading}
+                                className="text-xs bg-gray-600 text-white px-2 py-1 rounded hover:bg-gray-700 disabled:opacity-50"
+                              >
+                                Refresh
+                              </button>
+                            )}
                           </div>
                         </td>
                       </tr>

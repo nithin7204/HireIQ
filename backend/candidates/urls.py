@@ -10,7 +10,11 @@ from .views import (
     auto_generate_questions,
     get_candidate_questions,
     save_audio_response,
-    get_candidate_responses
+    get_candidate_responses,
+    transcribe_audio_view,
+    evaluate_candidate_answer,
+    batch_evaluate_answers,
+    fetch_candidate_evaluation
 )
 
 urlpatterns = [
@@ -24,4 +28,8 @@ urlpatterns = [
     path('questions/<str:candidate_id>/', get_candidate_questions, name='get-candidate-questions'),
     path('save-audio-response/', save_audio_response, name='save-audio-response'),
     path('responses/<str:candidate_id>/', get_candidate_responses, name='get-candidate-responses'),
+    path('transcribe-audio/', transcribe_audio_view, name='transcribe-audio'),
+    path('evaluate-answer/', evaluate_candidate_answer, name='evaluate-candidate-answer'),
+    path('batch-evaluate/', batch_evaluate_answers, name='batch-evaluate-answers'),
+    path('fetch-evaluation/', fetch_candidate_evaluation, name='fetch-candidate-evaluation'),
 ]

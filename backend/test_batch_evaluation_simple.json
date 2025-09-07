@@ -1,0 +1,17 @@
+{
+  "candidate_id": "CAND-123456",
+  "evaluations": [
+    {
+      "question": "What is the difference between a list and a tuple in Python?",
+      "answer": "Lists are mutable sequences in Python, meaning you can modify them after creation by adding, removing, or changing elements. They are defined using square brackets []. Tuples are immutable sequences, meaning once created, you cannot modify their contents. They are defined using parentheses (). Lists are generally used when you need a collection that can change, while tuples are used for data that should remain constant, like coordinates or database records."
+    },
+    {
+      "question": "Explain what REST API is and its key principles.",
+      "answer": "REST (Representational State Transfer) is an architectural style for designing web APIs. Key principles include: 1) Statelessness - each request must contain all information needed to process it, 2) Client-server separation - clear separation between client and server responsibilities, 3) Uniform interface - consistent way to interact with resources using HTTP methods, 4) Resource-based URLs - endpoints represent resources, not actions, 5) HTTP methods - GET for retrieval, POST for creation, PUT for updates, DELETE for removal. REST APIs are scalable, simple to understand, and work well with HTTP protocol."
+    },
+    {
+      "question": "Tell me about a challenging bug you fixed recently.",
+      "answer": "I recently encountered a memory leak in our Node.js application that was causing the server to crash after running for several hours. The issue was in our WebSocket connection handler where we were adding event listeners but not properly removing them when connections closed. Using Node.js profiling tools and memory snapshots, I identified that EventEmitter instances were accumulating. I fixed it by implementing proper cleanup in the disconnect handler, removing all event listeners and clearing references. I also added monitoring to track memory usage and implemented automated alerts for memory thresholds."
+    }
+  ]
+}

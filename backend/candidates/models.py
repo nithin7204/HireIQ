@@ -25,6 +25,12 @@ class Candidate(Document):
     # Audio responses
     audio_responses = ListField(DictField())  # Store audio responses with metadata
     
+    # Evaluation results
+    evaluation_score = StringField(max_length=10)  # Overall score (e.g., "8.5")
+    evaluation_rating = StringField(max_length=50)  # Overall rating (e.g., "Excellent", "Good")
+    evaluation_data = DictField()  # Store complete evaluation results
+    evaluation_timestamp = DateTimeField()  # When evaluation was completed
+    
     meta = {
         'collection': 'candidates',
         'ordering': ['-created_at'],

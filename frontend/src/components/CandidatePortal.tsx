@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import axios from 'axios';
 import AudioInterview from './AudioInterview';
 
@@ -26,6 +26,7 @@ const CandidatePortal: React.FC<CandidatePortalProps> = ({ candidate, onLogout, 
   const [uploading, setUploading] = useState(false);
   const [uploadMessage, setUploadMessage] = useState('');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const selectedFileRef = useRef<File | null>(null);
   const [dragOver, setDragOver] = useState(false);
   const [showUploadSection, setShowUploadSection] = useState(!candidate.has_resume);
   const [showInterview, setShowInterview] = useState(false);
@@ -47,6 +48,7 @@ const CandidatePortal: React.FC<CandidatePortalProps> = ({ candidate, onLogout, 
     }
 
     setSelectedFile(file);
+    selectedFileRef.current = file;
     setUploadMessage('');
   };
 
@@ -83,7 +85,8 @@ const CandidatePortal: React.FC<CandidatePortalProps> = ({ candidate, onLogout, 
   };
 
   const uploadResume = async () => {
-    if (!selectedFile) {
+    const fileToUpload = selectedFileRef.current;
+    if (!fileToUpload) {
       setUploadMessage('Please select a file first.');
       return;
     }
@@ -93,40 +96,67 @@ const CandidatePortal: React.FC<CandidatePortalProps> = ({ candidate, onLogout, 
 
     const formData = new FormData();
     formData.append('candidate_id', candidate.candidate_id);
-    formData.append('resume', selectedFile);
+    formData.append('resume', fileToUpload);
 
     try {
+      console.log('Starting upload...', {
+        candidateId: candidate.candidate_id,
+        fileName: fileToUpload.name,
+        fileSize: fileToUpload.size,
+        apiUrl: `${API_BASE_URL}/candidates/upload-resume/`
+      });
+      
       const response = await axios.post(`${API_BASE_URL}/candidates/upload-resume/`, formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
       });
 
-      setUploadMessage('Resume uploaded successfully!');
-      setSelectedFile(null);
-      // Reset file input
-      const fileInput = document.getElementById('resume-upload') as HTMLInputElement;
-      if (fileInput) fileInput.value = '';
+      console.log('Upload response:', response.data);
+      console.log('Setting success message...');
+      setUploadMessage('Resume uploaded successfully! Updating your profile...');
+      console.log('Success message set, clearing selected file...');
+      removeSelectedFile();
       
       // Update candidate data with new resume info
       if (response.data.candidate) {
+        console.log('Updating candidate data...', response.data.candidate);
         onCandidateUpdate(response.data.candidate);
-        // Hide upload section after successful upload
-        setShowUploadSection(false);
+        console.log('Candidate data updated, setting timeout for UI changes...');
+        // Hide upload section after successful upload to show the resume info section
+        setTimeout(() => {
+          console.log('Hiding upload section...');
+          setShowUploadSection(false);
+          // Clear success message after showing it for a few more seconds
+          setTimeout(() => {
+            console.log('Clearing success message...');
+            setUploadMessage('');
+          }, 4000); // Clear message 4 seconds after hiding upload section
+        }, 1000); // Hide upload section after 1 second to let user see success message
+      } else {
+        console.log('No candidate data in response:', response.data);
       }
     } catch (error: any) {
       console.error('Upload failed:', error);
+      console.error('Error details:', {
+        message: error.message,
+        status: error.response?.status,
+        statusText: error.response?.statusText,
+        data: error.response?.data,
+        url: error.config?.url
+      });
+      // Do not clear selected file or reset file input on error
       if (error.response?.data?.error) {
         setUploadMessage(error.response.data.error);
+      } else if (error.response?.status) {
+        setUploadMessage(`Upload failed with status ${error.response.status}: ${error.response.statusText || 'Unknown error'}`);
       } else {
         setUploadMessage('Upload failed. Please try again.');
       }
     } finally {
       setUploading(false);
     }
-  };
-
-  const proceedToInterview = async () => {
+  };  const proceedToInterview = async () => {
     setCheckingQuestions(true);
     
     try {
@@ -165,9 +195,25 @@ const CandidatePortal: React.FC<CandidatePortalProps> = ({ candidate, onLogout, 
 
   const removeSelectedFile = () => {
     setSelectedFile(null);
+    selectedFileRef.current = null;
     setUploadMessage('');
     const fileInput = document.getElementById('resume-upload') as HTMLInputElement;
     if (fileInput) fileInput.value = '';
+  };
+
+  const toggleUploadSection = () => {
+    if (showUploadSection) {
+      // If hiding the upload section, clear any selection
+      removeSelectedFile();
+    } else {
+      // If showing the upload section, clear any previous state but don't show message immediately
+      setUploadMessage('');
+      setSelectedFile(null);
+      // Clear the file input
+      const fileInput = document.getElementById('resume-upload') as HTMLInputElement;
+      if (fileInput) fileInput.value = '';
+    }
+    setShowUploadSection(!showUploadSection);
   };
 
   // Show interview component if requested
@@ -231,11 +277,23 @@ const CandidatePortal: React.FC<CandidatePortalProps> = ({ candidate, onLogout, 
 
         {/* Resume Upload Card */}
         <div className="bg-white rounded-lg shadow p-6 mb-8">
+          {/* Global Upload Success Message - shown outside upload section */}
+          {uploadMessage && uploadMessage.includes('successfully') && !showUploadSection && (
+            <div className="mb-4 p-4 rounded-lg border-2 bg-green-50 border-green-400 text-green-800">
+              <div className="flex items-center">
+                <svg className="w-5 h-5 text-green-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <span className="font-medium">{uploadMessage}</span>
+              </div>
+            </div>
+          )}
+          
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-xl font-semibold text-gray-900">Resume Upload</h2>
             {candidate.has_resume && (
               <button
-                onClick={() => setShowUploadSection(!showUploadSection)}
+                onClick={toggleUploadSection}
                 className="text-sm text-blue-600 hover:text-blue-800 font-medium"
               >
                 {showUploadSection ? 'Hide Upload' : 'Upload New Resume'}
@@ -275,7 +333,7 @@ const CandidatePortal: React.FC<CandidatePortalProps> = ({ candidate, onLogout, 
           {showUploadSection && (
             <div className="space-y-4">
               <div
-                className={`border-2 border-dashed rounded-lg p-6 text-center transition-colors ${
+                className={`border-2 border-dashed rounded-lg relative p-6 text-center transition-colors ${
                   dragOver
                     ? 'border-blue-400 bg-blue-50'
                     : 'border-gray-300 hover:border-gray-400'
@@ -344,14 +402,25 @@ const CandidatePortal: React.FC<CandidatePortalProps> = ({ candidate, onLogout, 
                 </button>
               </div>
 
-              {/* Upload Message */}
-              {uploadMessage && (
-                <div className={`p-3 rounded-md ${
-                  uploadMessage.includes('successfully') 
-                    ? 'bg-green-100 border border-green-400 text-green-700'
-                    : 'bg-red-100 border border-red-400 text-red-700'
+              {/* Upload Message - only show errors and info messages, not success */}
+              {uploadMessage && !uploadMessage.includes('successfully') && (
+                <div className={`p-4 rounded-lg border-2 ${
+                  uploadMessage.includes('Please select a new resume') 
+                    ? 'bg-blue-50 border-blue-400 text-blue-800'
+                    : 'bg-red-50 border-red-400 text-red-800'
                 }`}>
-                  {uploadMessage}
+                  <div className="flex items-center">
+                    {uploadMessage.includes('Please select a new resume') ? (
+                      <svg className="w-5 h-5 text-blue-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                    ) : (
+                      <svg className="w-5 h-5 text-red-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                    )}
+                    <span className="font-medium">{uploadMessage}</span>
+                  </div>
                 </div>
               )}
             </div>
@@ -362,7 +431,11 @@ const CandidatePortal: React.FC<CandidatePortalProps> = ({ candidate, onLogout, 
             <div className="text-center py-8">
               <p className="text-gray-600 mb-4">Please upload your resume to proceed with the interview process.</p>
               <button
-                onClick={() => setShowUploadSection(true)}
+                onClick={() => {
+                  setUploadMessage('');
+                  setSelectedFile(null);
+                  setShowUploadSection(true);
+                }}
                 className="bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 transition duration-200"
               >
                 Upload Resume

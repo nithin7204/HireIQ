@@ -1,0 +1,37 @@
+{
+  "candidate_id": "CAND-123456",
+  "evaluations": [
+    {
+      "question": "Explain the difference between SQL and NoSQL databases and when you would use each.",
+      "answer": "SQL databases are relational databases that use structured query language for defining and manipulating data. They have ACID properties which ensure data consistency and reliability. Examples include MySQL, PostgreSQL, and Oracle. They're best for applications requiring complex queries, transactions, and data integrity like banking systems or e-commerce platforms. NoSQL databases are non-relational and can handle unstructured data. They include document stores like MongoDB, key-value stores like Redis, column-family like Cassandra, and graph databases like Neo4j. They're more scalable and flexible, making them ideal for big data applications, real-time analytics, and applications with rapidly changing requirements."
+    },
+    {
+      "question": "What is the time complexity of searching in a binary search tree and explain how it can degrade?",
+      "answer": "The average time complexity for searching in a binary search tree is O(log n) where n is the number of nodes. This is because we can eliminate half of the remaining nodes at each step by comparing with the current node. However, in the worst case, when the tree becomes skewed or unbalanced (like a linked list), the time complexity degrades to O(n). This happens when we keep inserting elements in sorted order. To maintain O(log n) performance, we can use self-balancing trees like AVL trees or Red-Black trees that automatically rebalance themselves during insertions and deletions."
+    },
+    {
+      "question": "Describe the software development lifecycle and which methodology you prefer.",
+      "answer": "The SDLC consists of several phases: planning, analysis, design, implementation, testing, deployment, and maintenance. I prefer Agile methodology because it emphasizes iterative development, customer collaboration, and responding to change. In my previous projects, we used Scrum framework with 2-week sprints. This allowed us to deliver working software frequently, get early feedback from stakeholders, and adapt to changing requirements. The daily standups helped identify blockers early, and sprint retrospectives helped us continuously improve our process. However, I understand that waterfall might be better for projects with well-defined requirements and strict regulatory compliance."
+    },
+    {
+      "question": "How do you handle version control conflicts in Git?",
+      "answer": "When Git conflicts occur during merging or rebasing, I first use 'git status' to see which files have conflicts. Then I open the conflicted files and look for the conflict markers (<<<<<<<, =======, >>>>>>>). I analyze both versions to understand the changes and manually resolve by keeping the correct code or combining both changes appropriately. After resolving, I stage the files with 'git add' and complete the merge with 'git commit'. To prevent conflicts, I frequently pull from the main branch, use feature branches for development, and communicate with team members about overlapping work areas. For complex conflicts, I might use tools like VS Code's merge editor or external tools like Beyond Compare."
+    },
+    {
+      "question": "Tell me about a challenging project you worked on and how you overcame the obstacles.",
+      "answer": "I worked on a real-time data processing system that needed to handle 100k+ transactions per second. The main challenge was achieving low latency while maintaining data consistency. Initially, our monolithic architecture couldn't scale, causing bottlenecks. I proposed migrating to a microservices architecture using Apache Kafka for event streaming and Redis for caching. We implemented distributed caching and database sharding. The biggest obstacle was data consistency across services. We solved this using event sourcing and CQRS patterns. I led a team of 5 developers, coordinated with DevOps for deployment, and worked closely with stakeholders to manage expectations. The project took 8 months but we achieved 99.9% uptime and reduced response time from 500ms to under 50ms."
+    },
+    {
+      "question": "What is your experience with cloud platforms and which one do you prefer?",
+      "answer": "I have worked extensively with AWS, Azure, and Google Cloud Platform. In AWS, I've used EC2, S3, RDS, Lambda, API Gateway, and CloudFormation for infrastructure as code. I deployed containerized applications using ECS and EKS. In Azure, I've worked with App Services, Cosmos DB, and Azure Functions. I prefer AWS because of its comprehensive service ecosystem, mature documentation, and strong community support. For a recent project, I architected a serverless application using Lambda functions with API Gateway, DynamoDB for data storage, and S3 for file storage. This reduced infrastructure costs by 40% and improved scalability. I also have experience with CI/CD pipelines using AWS CodePipeline and CodeBuild."
+    },
+    {
+      "question": "How do you ensure code quality in your projects?",
+      "answer": "I follow several practices to ensure code quality. First, I write clean, readable code following SOLID principles and established coding standards. I use meaningful variable names, add comments for complex logic, and keep functions small and focused. For testing, I implement unit tests with at least 80% coverage, integration tests for API endpoints, and end-to-end tests for critical user flows. I use tools like SonarQube for static code analysis to detect code smells, security vulnerabilities, and maintainability issues. Code reviews are mandatory - every pull request needs approval from at least two team members. We use linting tools like ESLint for JavaScript and Pylint for Python. I also advocate for pair programming for complex features and regular refactoring to reduce technical debt."
+    },
+    {
+      "question": "Explain RESTful API design principles and best practices.",
+      "answer": "RESTful APIs should follow several key principles. First, use HTTP methods correctly: GET for retrieval, POST for creation, PUT for updates, DELETE for removal. URLs should be resource-based and hierarchical, like /users/123/orders rather than /getUserOrders. Use proper HTTP status codes: 200 for success, 201 for creation, 400 for client errors, 500 for server errors. Implement proper error handling with consistent error response format including error codes and descriptive messages. Use pagination for large datasets, implement rate limiting to prevent abuse, and version your APIs using headers or URL versioning. Security is crucial - implement authentication using JWT tokens, authorization with role-based access control, and HTTPS for all communications. Document APIs thoroughly using tools like Swagger/OpenAPI. I also ensure idempotency for PUT and DELETE operations."
+    }
+  ]
+}

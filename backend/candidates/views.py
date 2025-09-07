@@ -13,6 +13,8 @@ import uuid
 from datetime import datetime
 from .models import Candidate
 from .serializers import CandidateSerializer, CandidateCreateSerializer
+from candidates.ml_models.voiceToText import transcribe_audio
+from candidates.ml_models.evaluate import evaluate_candidate_answer as eval_function
 
 class CandidateListCreateView(generics.ListCreateAPIView):
     permission_classes = [IsAuthenticated]
@@ -684,5 +686,434 @@ def get_candidate_responses(request, candidate_id):
     except Exception as e:
         return Response(
             {'error': f'Failed to get responses: {str(e)}'}, 
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+@api_view(['POST'])
+@permission_classes([])
+def transcribe_audio_view(request):
+    """
+    Accepts an uploaded audio file and returns its transcription.
+    Expects the audio file in request.FILES['audio'].
+    Optional: service parameter ('gemini', 'openai', 'google') - defaults to 'gemini'
+    Note: Gemini has automatic fallback to OpenAI if rate limits are hit.
+    """
+    audio_file = request.FILES.get('audio')
+    service = request.data.get('service', 'gemini')  # Changed back to Gemini default
+    
+    if not audio_file:
+        return Response({'error': 'Audio file is required.'}, status=status.HTTP_400_BAD_REQUEST)
+    
+    print(f"DEBUG: Using transcription service: {service}")
+    print(f"DEBUG: Audio file: {audio_file.name}, Size: {audio_file.size} bytes")
+    
+    try:
+        text = transcribe_audio(audio_file, service=service)
+        return Response({
+            'transcription': text,
+            'service_used': service,
+            'audio_filename': audio_file.name,
+            'audio_size_bytes': audio_file.size,
+            'message': 'Transcription successful'
+        }, status=status.HTTP_200_OK)
+    except Exception as e:
+        import traceback
+        print(f"Transcription error with {service}: {str(e)}")
+        traceback.print_exc()
+        
+        # Provide helpful error message for rate limits
+        if "rate limit" in str(e).lower() or "quota" in str(e).lower() or "429" in str(e):
+            return Response({
+                'error': f'{service.title()} API rate limit exceeded. Try again later or use a different service.',
+                'service_attempted': service,
+                'suggestion': 'Try using "openai" service instead',
+                'rate_limit': True
+            }, status=status.HTTP_429_TOO_MANY_REQUESTS)
+        else:
+            return Response({
+                'error': f'{service.title()} transcription failed: {str(e)}',
+                'service_attempted': service
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+@api_view(['POST'])
+@permission_classes([])
+def evaluate_candidate_answer(request):
+    """
+    Evaluate a candidate's answer using Gemini AI.
+    
+    Expects POST data:
+    - question: The interview question (required)
+    - answer: The candidate's answer (required)
+    - candidate_id: ID of the candidate (required) - used to get resume
+    
+    Returns:
+    - overall_score: Score from 1-10
+    - detailed_scores: Breakdown of scores by category
+    - feedback: Detailed feedback
+    - strengths: Key strengths
+    - areas_for_improvement: Areas to improve
+    - resume_insights: How answer aligns with resume
+    """
+    try:
+        from .ml_models.evaluate import evaluate_candidate_answer as eval_function
+        from .gridfs_models import get_resume_content
+        
+        # Get request data
+        data = request.data
+        question = data.get('question', '').strip()
+        answer = data.get('answer', '').strip()
+        candidate_id = data.get('candidate_id', '').strip()
+        
+        # Validate required fields
+        if not question:
+            return Response(
+                {'error': 'Question is required'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        if not answer:
+            return Response(
+                {'error': 'Answer is required'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        if not candidate_id:
+            return Response(
+                {'error': 'Candidate ID is required'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Get candidate resume
+        try:
+            resume_content = get_resume_content(candidate_id)
+            if not resume_content:
+                return Response(
+                    {'error': 'Resume not found for this candidate'}, 
+                    status=status.HTTP_404_NOT_FOUND
+                )
+        except Exception as e:
+            print(f"Error getting resume: {str(e)}")
+            return Response(
+                {'error': 'Could not retrieve candidate resume'}, 
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        # Evaluate the answer
+        try:
+            print(f"Starting evaluation for candidate: {candidate_id}")
+            print(f"Question length: {len(question)}")
+            print(f"Answer length: {len(answer)}")
+            print(f"Resume content size: {len(resume_content)} bytes")
+            
+            evaluation_result = eval_function(question, answer, resume_content)
+            print(f"Evaluation result type: {type(evaluation_result)}")
+            print(f"Evaluation result keys: {list(evaluation_result.keys()) if isinstance(evaluation_result, dict) else 'Not a dict'}")
+            
+            # Check if evaluation was successful
+            if evaluation_result.get('error'):
+                error_message = evaluation_result.get('message', 'Unknown error')
+                print(f"Evaluation failed with error: {error_message}")
+                return Response(
+                    {
+                        'error': 'Evaluation failed',
+                        'details': error_message,
+                        'debug_info': {
+                            'result_keys': list(evaluation_result.keys()) if isinstance(evaluation_result, dict) else None,
+                            'result_type': str(type(evaluation_result))
+                        }
+                    }, 
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                )
+            
+            # Return successful evaluation
+            return Response({
+                'success': True,
+                'evaluation': evaluation_result,
+                'candidate_id': candidate_id,
+                'question': question[:100] + '...' if len(question) > 100 else question  # Truncate for response
+            }, status=status.HTTP_200_OK)
+            
+        except Exception as e:
+            print(f"Error during evaluation: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            return Response(
+                {
+                    'error': f'Evaluation processing failed: {str(e)}',
+                    'error_type': str(type(e).__name__),
+                    'traceback': traceback.format_exc()
+                }, 
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+    
+    except Exception as e:
+        print(f"Unexpected error in evaluate_candidate_answer: {str(e)}")
+        return Response(
+            {'error': f'Server error: {str(e)}'}, 
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+
+@api_view(['POST'])
+@permission_classes([])
+def batch_evaluate_answers(request):
+    """
+    Evaluate multiple answers at once.
+    
+    Expects POST data:
+    - candidate_id: ID of the candidate (required)
+    - evaluations: List of {question, answer} pairs (required)
+    
+    Returns:
+    - results: List of evaluation results
+    - summary: Overall evaluation summary
+    """
+    try:
+        from .ml_models.evaluate import evaluate_candidate_answer as eval_function
+        from .gridfs_models import get_resume_content
+        
+        # Get request data
+        data = request.data
+        candidate_id = data.get('candidate_id', '').strip()
+        evaluations = data.get('evaluations', [])
+        
+        # Validate required fields
+        if not candidate_id:
+            return Response(
+                {'error': 'Candidate ID is required'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        if not evaluations or not isinstance(evaluations, list):
+            return Response(
+                {'error': 'Evaluations list is required'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Get candidate resume once
+        try:
+            resume_content = get_resume_content(candidate_id)
+            if not resume_content:
+                return Response(
+                    {'error': 'Resume not found for this candidate'}, 
+                    status=status.HTTP_404_NOT_FOUND
+                )
+        except Exception as e:
+            return Response(
+                {'error': 'Could not retrieve candidate resume'}, 
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        # Process each evaluation
+        results = []
+        total_score = 0
+        successful_evaluations = 0
+        
+        for idx, evaluation in enumerate(evaluations):
+            question = evaluation.get('question', '').strip()
+            answer = evaluation.get('answer', '').strip()
+            
+            if not question or not answer:
+                results.append({
+                    'index': idx,
+                    'error': 'Question and answer are required',
+                    'question': question[:50] + '...' if len(question) > 50 else question
+                })
+                continue
+            
+            try:
+                evaluation_result = eval_function(question, answer, resume_content)
+                
+                if not evaluation_result.get('error'):
+                    total_score += evaluation_result.get('overall_score', 0)
+                    successful_evaluations += 1
+                
+                results.append({
+                    'index': idx,
+                    'question': question[:100] + '...' if len(question) > 100 else question,
+                    'evaluation': evaluation_result
+                })
+                
+            except Exception as e:
+                results.append({
+                    'index': idx,
+                    'error': f'Evaluation failed: {str(e)}',
+                    'question': question[:50] + '...' if len(question) > 50 else question
+                })
+        
+        # Calculate summary
+        average_score = total_score / successful_evaluations if successful_evaluations > 0 else 0
+        
+        summary = {
+            'total_questions': len(evaluations),
+            'successful_evaluations': successful_evaluations,
+            'failed_evaluations': len(evaluations) - successful_evaluations,
+            'average_score': round(average_score, 2),
+            'overall_rating': 'Excellent' if average_score >= 8 else 'Good' if average_score >= 6 else 'Average' if average_score >= 4 else 'Needs Improvement'
+        }
+        
+        return Response({
+            'success': True,
+            'candidate_id': candidate_id,
+            'results': results,
+            'summary': summary
+        }, status=status.HTTP_200_OK)
+        
+    except Exception as e:
+        print(f"Unexpected error in batch_evaluate_answers: {str(e)}")
+        return Response(
+            {'error': f'Server error: {str(e)}'}, 
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+
+@api_view(['POST'])
+@permission_classes([])
+def fetch_candidate_evaluation(request):
+    """
+    Fetch evaluation results for a candidate from their audio responses and store them.
+    
+    Expects POST data:
+    - candidate_id: ID of the candidate (required)
+    
+    Returns:
+    - evaluation_summary: Overall evaluation summary with scores and rating
+    """
+    try:
+        from .gridfs_models import get_resume_content
+        from .ml_models.evaluate import evaluate_candidate_answer as eval_function
+        from datetime import datetime
+        
+        # Get request data
+        data = request.data
+        candidate_id = data.get('candidate_id', '').strip()
+        
+        # Validate required fields
+        if not candidate_id:
+            return Response(
+                {'error': 'Candidate ID is required'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        try:
+            candidate = Candidate.objects.get(candidate_id=candidate_id, is_active=True)
+        except DoesNotExist:
+            return Response(
+                {'error': 'Invalid candidate ID'}, 
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        # Check if candidate has audio responses
+        if not candidate.audio_responses:
+            return Response(
+                {'error': 'No interview responses found for this candidate'}, 
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        # Get candidate resume
+        try:
+            resume_content = get_resume_content(candidate_id)
+            if not resume_content:
+                return Response(
+                    {'error': 'Resume not found for this candidate'}, 
+                    status=status.HTTP_404_NOT_FOUND
+                )
+        except Exception as e:
+            return Response(
+                {'error': 'Could not retrieve candidate resume'}, 
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        # Prepare evaluations from audio responses
+        evaluations = []
+        for response in candidate.audio_responses:
+            question = response.get('question_text', '')
+            answer = response.get('transcription', '')
+            
+            if question and answer:
+                evaluations.append({
+                    'question': question,
+                    'answer': answer
+                })
+        
+        if not evaluations:
+            return Response(
+                {'error': 'No valid question-answer pairs found in interview responses'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Process evaluations
+        results = []
+        total_score = 0
+        successful_evaluations = 0
+        
+        for idx, evaluation in enumerate(evaluations):
+            question = evaluation['question']
+            answer = evaluation['answer']
+            
+            try:
+                evaluation_result = eval_function(question, answer, resume_content)
+                
+                if not evaluation_result.get('error'):
+                    total_score += evaluation_result.get('overall_score', 0)
+                    successful_evaluations += 1
+                
+                results.append({
+                    'index': idx,
+                    'question': question[:100] + '...' if len(question) > 100 else question,
+                    'evaluation': evaluation_result
+                })
+                
+            except Exception as e:
+                results.append({
+                    'index': idx,
+                    'error': f'Evaluation failed: {str(e)}',
+                    'question': question[:50] + '...' if len(question) > 50 else question
+                })
+        
+        # Calculate summary
+        average_score = total_score / successful_evaluations if successful_evaluations > 0 else 0
+        
+        # Determine rating based on average score
+        if average_score >= 8:
+            overall_rating = 'Excellent'
+        elif average_score >= 6:
+            overall_rating = 'Good'
+        elif average_score >= 4:
+            overall_rating = 'Average'
+        else:
+            overall_rating = 'Needs Improvement'
+        
+        summary = {
+            'total_questions': len(evaluations),
+            'successful_evaluations': successful_evaluations,
+            'failed_evaluations': len(evaluations) - successful_evaluations,
+            'average_score': round(average_score, 2),
+            'overall_rating': overall_rating
+        }
+        
+        # Save evaluation results to candidate
+        candidate.evaluation_score = str(round(average_score, 2))
+        candidate.evaluation_rating = overall_rating
+        candidate.evaluation_data = {
+            'summary': summary,
+            'results': results,
+            'evaluated_at': datetime.utcnow().isoformat()
+        }
+        candidate.evaluation_timestamp = datetime.utcnow()
+        candidate.save()
+        
+        return Response({
+            'success': True,
+            'candidate_id': candidate_id,
+            'evaluation_summary': summary,
+            'candidate': CandidateSerializer(candidate).data
+        }, status=status.HTTP_200_OK)
+        
+    except Exception as e:
+        print(f"Unexpected error in fetch_candidate_evaluation: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return Response(
+            {'error': f'Server error: {str(e)}'}, 
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )

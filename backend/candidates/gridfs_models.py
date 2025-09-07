@@ -204,3 +204,106 @@ def download_resume_gridfs(request, candidate_id):
 # - Use BinaryField for files < 10MB (like most resumes)
 # - Use GridFS for files > 16MB or when you need advanced file management features
 # - GridFS has more overhead for small files but is more efficient for large files
+def get_resume_content(candidate_id):
+    """
+    Get resume content (binary data) for a given candidate ID.
+    This function works with both GridFS and regular BinaryField storage.
+    
+    Args:
+        candidate_id (str): Candidate ID
+        
+    Returns:
+        bytes: Resume PDF binary data or None if not found
+    """
+    try:
+        # First try to get from regular Candidate model (most common)
+        from .models import Candidate
+        
+        candidate = Candidate.objects.filter(
+            candidate_id=candidate_id, 
+            is_active=True
+        ).first()
+        
+        if candidate and candidate.resume_data:
+            return candidate.resume_data
+        
+        # If not found in regular model, try GridFS model
+        try:
+            candidate_gridfs = CandidateGridFS.objects.filter(
+                candidate_id=candidate_id, 
+                is_active=True
+            ).first()
+            
+            if candidate_gridfs and candidate_gridfs.resume_gridfs_id:
+                gridfs_helper = GridFSHelper()
+                gridfs_file = gridfs_helper.get_file(candidate_gridfs.resume_gridfs_id)
+                
+                if gridfs_file:
+                    return gridfs_file.read()
+        except Exception as e:
+            print(f"Error accessing GridFS: {str(e)}")
+        
+        return None
+        
+    except Exception as e:
+        print(f"Error in get_resume_content: {str(e)}")
+        return None
+
+
+def get_candidate_resume_info(candidate_id):
+    """
+    Get resume information (filename, size, content type) for a candidate.
+    
+    Args:
+        candidate_id (str): Candidate ID
+        
+    Returns:
+        dict: Resume info or None if not found
+    """
+    try:
+        # First try regular model
+        from .models import Candidate
+        
+        candidate = Candidate.objects.filter(
+            candidate_id=candidate_id, 
+            is_active=True
+        ).first()
+        
+        if candidate and candidate.resume_data:
+            return {
+                'filename': candidate.resume_filename,
+                'size': candidate.resume_size,
+                'content_type': candidate.resume_content_type,
+                'has_resume': True,
+                'storage_type': 'binary_field'
+            }
+        
+        # Try GridFS model
+        try:
+            candidate_gridfs = CandidateGridFS.objects.filter(
+                candidate_id=candidate_id, 
+                is_active=True
+            ).first()
+            
+            if candidate_gridfs and candidate_gridfs.resume_gridfs_id:
+                return {
+                    'filename': candidate_gridfs.resume_filename,
+                    'size': candidate_gridfs.resume_size,
+                    'content_type': candidate_gridfs.resume_content_type,
+                    'has_resume': True,
+                    'storage_type': 'gridfs'
+                }
+        except Exception as e:
+            print(f"Error accessing GridFS info: {str(e)}")
+        
+        return {
+            'has_resume': False,
+            'storage_type': None
+        }
+        
+    except Exception as e:
+        print(f"Error in get_candidate_resume_info: {str(e)}")
+        return {
+            'has_resume': False,
+            'error': str(e)
+        }
