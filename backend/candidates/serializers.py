@@ -86,6 +86,8 @@ class CandidateSerializer(serializers.Serializer):
 
 class CandidateCreateSerializer(serializers.Serializer):
     email = serializers.EmailField()
+    company = serializers.CharField(required=False, allow_blank=True)
+    role = serializers.CharField(required=False, allow_blank=True)
     hr_prompt = serializers.CharField(required=False, allow_blank=True)
 
     def create(self, validated_data):

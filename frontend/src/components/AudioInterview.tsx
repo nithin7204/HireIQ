@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import axios from 'axios';
+import { useTheme } from '../contexts/ThemeContext';
 
 interface Question {
   id: string;
@@ -28,6 +29,7 @@ const AudioInterview: React.FC<AudioInterviewProps> = ({ candidateId, onBackToPo
   const [hrInstructions, setHrInstructions] = useState('');
   const [showInstructions, setShowInstructions] = useState(true);
   const [instructionsRead, setInstructionsRead] = useState(false);
+  const { isDarkMode, toggleDarkMode } = useTheme();
   
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
@@ -440,10 +442,15 @@ Remember: We're looking for your thought process, not just the right answer. Goo
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 dark:from-gray-900 dark:via-slate-900 dark:to-indigo-950 transition-colors duration-300 flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Preparing your technical interview...</p>
+          <div className="w-20 h-20 bg-gradient-to-r from-blue-500 to-indigo-500 rounded-3xl mx-auto mb-6 flex items-center justify-center shadow-2xl">
+            <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-white"></div>
+          </div>
+          <h2 className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent mb-2">
+            Preparing Your Interview
+          </h2>
+          <p className="text-gray-600 dark:text-gray-400 text-lg">Setting up your personalized questions...</p>
         </div>
       </div>
     );
@@ -451,18 +458,20 @@ Remember: We're looking for your thought process, not just the right answer. Goo
 
   if (questions.length === 0) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center max-w-md">
-          <svg className="w-16 h-16 text-red-500 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
-          </svg>
-          <h2 className="text-xl font-semibold text-gray-900 mb-2">Interview Not Ready</h2>
-          <p className="text-gray-600 mb-4">
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 dark:from-gray-900 dark:via-slate-900 dark:to-indigo-950 transition-colors duration-300 flex items-center justify-center">
+        <div className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-xl rounded-3xl shadow-2xl p-10 max-w-md w-full border border-white/20 dark:border-gray-700/30 text-center">
+          <div className="bg-gradient-to-r from-red-500 to-pink-500 p-4 rounded-2xl mx-auto mb-6 w-fit shadow-lg">
+            <svg className="w-12 h-12 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+            </svg>
+          </div>
+          <h2 className="text-2xl font-bold bg-gradient-to-r from-red-600 to-pink-600 bg-clip-text text-transparent mb-4">Interview Not Ready</h2>
+          <p className="text-gray-600 dark:text-gray-400 mb-6 leading-relaxed">
             Unable to prepare your interview questions. Please try again or contact support.
           </p>
           <button
             onClick={onBackToPortal}
-            className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition duration-200"
+            className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-6 py-3 rounded-2xl hover:from-blue-700 hover:to-indigo-700 transition-all duration-200 font-semibold shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
           >
             Back to Portal
           </button>
@@ -478,45 +487,70 @@ Remember: We're looking for your thought process, not just the right answer. Goo
 
   if (interviewCompleted) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-green-50 to-blue-50 flex items-center justify-center">
-        <div className="text-center max-w-lg">
-          <div className="w-20 h-20 bg-gradient-to-r from-green-500 to-blue-500 rounded-full mx-auto mb-6 flex items-center justify-center">
-            <svg className="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-green-50 to-blue-50 dark:from-gray-900 dark:via-green-900/20 dark:to-blue-950 transition-colors duration-300 flex items-center justify-center p-4">
+        {/* Background Pattern */}
+        <div className="absolute inset-0 overflow-hidden">
+          <div className="absolute inset-0 bg-gradient-to-r from-green-500/5 to-blue-500/5 dark:from-green-400/5 dark:to-blue-400/5"></div>
+          <div className="absolute top-1/4 left-1/4 transform -translate-x-1/2 w-96 h-96 bg-gradient-to-r from-green-400/10 to-blue-400/10 dark:from-green-300/5 dark:to-blue-300/5 rounded-full blur-3xl"></div>
+        </div>
+
+        <div className="relative bg-white/80 dark:bg-gray-800/80 backdrop-blur-xl rounded-3xl shadow-2xl p-10 max-w-2xl w-full border border-white/20 dark:border-gray-700/30 text-center">
+          <div className="w-24 h-24 bg-gradient-to-r from-green-500 to-blue-500 rounded-full mx-auto mb-8 flex items-center justify-center shadow-2xl">
+            <svg className="w-12 h-12 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
           </div>
-          <h2 className="text-3xl font-bold text-gray-900 mb-4">Interview Completed!</h2>
-          <p className="text-lg text-gray-600 mb-6">
-            Thank you for completing your technical interview. Your responses have been saved successfully.
+          <h2 className="text-4xl font-bold bg-gradient-to-r from-green-600 to-blue-600 bg-clip-text text-transparent mb-6">
+            🎉 Interview Completed!
+          </h2>
+          <p className="text-xl text-gray-600 dark:text-gray-400 mb-8 leading-relaxed">
+            Thank you for completing your technical interview. Your responses have been saved successfully and our AI is already analyzing your performance.
           </p>
           
-          <div className="bg-white rounded-lg shadow-sm border p-6 mb-6">
-            <h3 className="text-xl font-semibold text-gray-900 mb-4">Interview Summary</h3>
-            <div className="grid grid-cols-2 gap-4 text-sm">
-              <div className="bg-blue-50 p-4 rounded-lg">
-                <div className="text-2xl font-bold text-blue-600">{Object.keys(responses).length}</div>
-                <div className="text-blue-800">Questions Answered</div>
+          <div className="bg-gradient-to-r from-blue-50 to-green-50 dark:from-blue-900/20 dark:to-green-900/20 rounded-2xl shadow-lg p-8 mb-8 border border-blue-200 dark:border-blue-700">
+            <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-6">Interview Summary</h3>
+            <div className="grid grid-cols-2 gap-6">
+              <div className="bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-lg">
+                <div className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent mb-2">
+                  {Object.keys(responses).length}
+                </div>
+                <div className="text-blue-800 dark:text-blue-300 font-semibold">Questions Answered</div>
               </div>
-              <div className="bg-green-50 p-4 rounded-lg">
-                <div className="text-2xl font-bold text-green-600">{questions.length}</div>
-                <div className="text-green-800">Total Questions</div>
+              <div className="bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-lg">
+                <div className="text-3xl font-bold bg-gradient-to-r from-green-600 to-emerald-600 bg-clip-text text-transparent mb-2">
+                  {questions.length}
+                </div>
+                <div className="text-green-800 dark:text-green-300 font-semibold">Total Questions</div>
               </div>
             </div>
           </div>
 
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-6 mb-6">
-            <h4 className="font-semibold text-blue-900 mb-2">What happens next?</h4>
-            <p className="text-blue-800 text-sm">
-              Our team will review your responses and get back to you within 3-5 business days. 
+          <div className="bg-gradient-to-r from-indigo-50 to-purple-50 dark:from-indigo-900/20 dark:to-purple-900/20 border border-indigo-200 dark:border-indigo-700 rounded-2xl p-6 mb-8">
+            <div className="flex items-center justify-center mb-4">
+              <div className="bg-indigo-500 p-2 rounded-xl mr-3">
+                <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </div>
+              <h4 className="text-xl font-bold text-indigo-900 dark:text-indigo-300">What happens next?</h4>
+            </div>
+            <p className="text-indigo-800 dark:text-indigo-400 leading-relaxed">
+              Our AI evaluation system will analyze your responses and generate a comprehensive report. 
+              Our team will review your performance and get back to you within <strong>3-5 business days</strong>. 
               Thank you for your interest in this position!
             </p>
           </div>
 
           <button
             onClick={onBackToPortal}
-            className="bg-blue-600 text-white px-8 py-3 rounded-lg hover:bg-blue-700 transition duration-200 font-semibold"
+            className="bg-gradient-to-r from-green-600 to-blue-600 text-white px-10 py-4 rounded-2xl hover:from-green-700 hover:to-blue-700 transition-all duration-300 font-bold text-lg shadow-2xl hover:shadow-3xl transform hover:-translate-y-1 hover:scale-105"
           >
-            Return to Portal
+            <div className="flex items-center">
+              <svg className="w-6 h-6 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+              </svg>
+              Return to Portal
+            </div>
           </button>
         </div>
       </div>
@@ -528,46 +562,77 @@ Remember: We're looking for your thought process, not just the right answer. Goo
   const hasResponse = responses[currentQuestion?.id];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 dark:from-gray-900 dark:via-slate-900 dark:to-indigo-950 transition-colors duration-300">
+      {/* Background Pattern */}
+      <div className="absolute inset-0 overflow-hidden">
+        <div className="absolute inset-0 bg-gradient-to-r from-indigo-500/5 to-purple-500/5 dark:from-indigo-400/5 dark:to-purple-400/5"></div>
+        <div className="absolute top-1/4 left-1/4 transform -translate-x-1/2 w-96 h-96 bg-gradient-to-r from-blue-400/10 to-indigo-400/10 dark:from-blue-300/5 dark:to-indigo-300/5 rounded-full blur-3xl"></div>
+        <div className="absolute bottom-1/4 right-1/4 w-80 h-80 bg-gradient-to-r from-purple-400/10 to-pink-400/10 dark:from-purple-300/5 dark:to-pink-300/5 rounded-full blur-3xl"></div>
+      </div>
+
       {/* Header */}
-      <div className="bg-white shadow-sm border-b">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center py-4">
-            <div className="flex items-center">
-              <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-indigo-500 rounded-full mr-3 flex items-center justify-center">
-                <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+      <div className="relative bg-white/80 dark:bg-gray-800/80 backdrop-blur-xl shadow-lg border-b border-white/20 dark:border-gray-700/30">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex justify-between items-center py-6">
+            <div className="flex items-center space-x-4">
+              <div className="w-12 h-12 bg-gradient-to-r from-blue-500 to-indigo-500 rounded-2xl shadow-lg flex items-center justify-center">
+                <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
                 </svg>
               </div>
               <div>
-                <h1 className="text-xl font-bold text-gray-900">Technical Interview</h1>
-                <p className="text-sm text-gray-600">
-                  Question {currentQuestionIndex + 1} of {questions.length} • AI Interviewer
+                <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
+                  AI Technical Interview
+                </h1>
+                <p className="text-gray-600 dark:text-gray-400 text-lg">
+                  Question {currentQuestionIndex + 1} of {questions.length} • Powered by Advanced AI
                 </p>
               </div>
             </div>
-            <button
-              onClick={onBackToPortal}
-              className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md transition duration-200"
-            >
-              Exit Interview
-            </button>
+            <div className="flex items-center space-x-4">
+              <button
+                onClick={toggleDarkMode}
+                className="p-3 rounded-xl bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 transition-all duration-200"
+                aria-label="Toggle dark mode"
+              >
+                {isDarkMode ? (
+                  <svg className="w-5 h-5 text-yellow-500" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M10 2a1 1 0 011 1v1a1 1 0 11-2 0V3a1 1 0 011-1zm4 8a4 4 0 11-8 0 4 4 0 018 0zm-.464 4.95l.707.707a1 1 0 001.414-1.414l-.707-.707a1 1 0 00-1.414 1.414zm2.12-10.607a1 1 0 010 1.414l-.706.707a1 1 0 11-1.414-1.414l.707-.707a1 1 0 011.414 0zM17 11a1 1 0 100-2h-1a1 1 0 100 2h1zm-7 4a1 1 0 011 1v1a1 1 0 11-2 0v-1a1 1 0 011-1zM5.05 6.464A1 1 0 106.465 5.05l-.708-.707a1 1 0 00-1.414 1.414l.707.707zm1.414 8.486l-.707.707a1 1 0 01-1.414-1.414l.707-.707a1 1 0 011.414 1.414zM4 11a1 1 0 100-2H3a1 1 0 000 2h1z" clipRule="evenodd" />
+                  </svg>
+                ) : (
+                  <svg className="w-5 h-5 text-gray-700 dark:text-gray-300" fill="currentColor" viewBox="0 0 20 20">
+                    <path d="M17.293 13.293A8 8 0 016.707 2.707a8.001 8.001 0 1010.586 10.586z" />
+                  </svg>
+                )}
+              </button>
+              <button
+                onClick={onBackToPortal}
+                className="px-6 py-3 text-sm font-semibold text-gray-700 dark:text-gray-300 bg-white/50 dark:bg-gray-800/50 hover:bg-gray-100/80 dark:hover:bg-gray-700/80 rounded-xl backdrop-blur-sm border border-gray-200 dark:border-gray-600 transition-all duration-200 hover:shadow-lg transform hover:-translate-y-0.5"
+              >
+                <div className="flex items-center space-x-2">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                  </svg>
+                  <span>Exit Interview</span>
+                </div>
+              </button>
+            </div>
           </div>
         </div>
       </div>
 
       {/* Progress Bar */}
-      <div className="bg-white border-b">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-sm font-medium text-gray-700">Interview Progress</span>
-            <span className="text-sm text-gray-500">
+      <div className="relative bg-white/60 dark:bg-gray-800/60 backdrop-blur-sm border-b border-white/20 dark:border-gray-700/30">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-sm font-bold text-gray-700 dark:text-gray-300">Interview Progress</span>
+            <span className="text-sm text-gray-500 dark:text-gray-400 font-semibold">
               {Math.round(((currentQuestionIndex + 1) / questions.length) * 100)}% Complete
             </span>
           </div>
-          <div className="w-full bg-gray-200 rounded-full h-3">
+          <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-4 shadow-inner">
             <div
-              className="bg-gradient-to-r from-blue-500 to-green-500 h-3 rounded-full transition-all duration-500"
+              className="bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-500 h-4 rounded-full transition-all duration-700 shadow-lg"
               style={{ width: `${((currentQuestionIndex + 1) / questions.length) * 100}%` }}
             ></div>
           </div>
@@ -575,33 +640,35 @@ Remember: We're looking for your thought process, not just the right answer. Goo
       </div>
 
       {/* Main Content */}
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="relative max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
         {/* AI Interviewer Card */}
-        <div className="bg-white rounded-lg shadow-sm border p-6 mb-6">
+        <div className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-xl rounded-3xl shadow-2xl p-8 mb-8 border border-white/20 dark:border-gray-700/30">
           <div className="flex items-start">
-            <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-full flex items-center justify-center mr-4 flex-shrink-0">
-              <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl flex items-center justify-center mr-6 flex-shrink-0 shadow-xl">
+              <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
               </svg>
             </div>
             <div className="flex-1">
-              <div className="flex items-center justify-between mb-2">
-                <h3 className="text-lg font-semibold text-gray-900">AI Interviewer</h3>
-                <div className="flex space-x-2">
-                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                    {currentQuestion.type || 'General'}
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
+                  🤖 AI Technical Interviewer
+                </h3>
+                <div className="flex space-x-3">
+                  <span className="inline-flex items-center px-3 py-1 rounded-xl text-sm font-semibold bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300 border border-blue-200 dark:border-blue-700">
+                    {currentQuestion.type || 'Technical'}
                   </span>
-                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                  <span className="inline-flex items-center px-3 py-1 rounded-xl text-sm font-semibold bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300 border border-green-200 dark:border-green-700">
                     {currentQuestion.topic}
                   </span>
                 </div>
               </div>
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                <p className="text-gray-800 leading-relaxed text-lg">
+              <div className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 border border-blue-200 dark:border-blue-700 rounded-2xl p-6 shadow-lg">
+                <p className="text-gray-800 dark:text-gray-200 leading-relaxed text-lg font-medium">
                   {currentQuestion.text}
                 </p>
               </div>
-              <div className="flex items-center mt-4 space-x-4">
+              <div className="flex items-center mt-6 space-x-6">
                 <button
                   onClick={() => {
                     const utterance = new SpeechSynthesisUtterance(currentQuestion.text);
@@ -609,14 +676,14 @@ Remember: We're looking for your thought process, not just the right answer. Goo
                     utterance.pitch = 1.0;
                     speechSynthesis.speak(utterance);
                   }}
-                  className="flex items-center text-sm text-blue-600 hover:text-blue-800 transition duration-200"
+                  className="flex items-center text-sm font-semibold text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 transition-all duration-200 bg-blue-50 dark:bg-blue-900/30 px-4 py-2 rounded-xl hover:bg-blue-100 dark:hover:bg-blue-900/50"
                 >
-                  <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 14.142M9 9v6l7-3-7-3z" />
                   </svg>
-                  Listen to Question
+                  🔊 Listen to Question
                 </button>
-                <div className="text-sm text-gray-500">
+                <div className="text-sm text-gray-600 dark:text-gray-400 font-medium bg-yellow-50 dark:bg-yellow-900/20 px-4 py-2 rounded-xl">
                   💡 Take your time to think through the problem
                 </div>
               </div>
