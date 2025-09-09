@@ -24,13 +24,7 @@ class CandidateSerializer(serializers.Serializer):
     
     def get_interview_score(self, obj):
         """Convert evaluation_score to integer for compatibility"""
-        if obj.evaluation_score:
-            try:
-                score = float(obj.evaluation_score)
-                return score * 10  # Convert to 100-point scale
-            except (ValueError, TypeError):
-                return None
-        return None
+        return self._get_interview_score_value(obj)
     
     def get_audio_responses_count(self, obj):
         """Return the number of audio responses"""
@@ -85,7 +79,7 @@ class CandidateSerializer(serializers.Serializer):
         if instance.evaluation_score:
             try:
                 score = float(instance.evaluation_score)
-                return score * 10  # Convert to 100-point scale
+                return min(100, max(0, score * 10))  # Convert to 100-point scale, clamped to 0-100
             except (ValueError, TypeError):
                 return None
         return None

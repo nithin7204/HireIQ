@@ -55,6 +55,7 @@ MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
+    'hireiq_backend.middleware.DisableCSRFForAPIMiddleware',  # Disable CSRF for API endpoints
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'social_django.middleware.SocialAuthExceptionMiddleware',
@@ -110,7 +111,8 @@ try:
 except Exception as e:
     print(f"Failed to connect to MongoDB Atlas: {e}")
 
-# CORS settings
+# CORS settings - More permissive for development
+CORS_ALLOW_ALL_ORIGINS = True  # Allow all origins during development
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",
     "http://127.0.0.1:3000",
@@ -127,7 +129,6 @@ CSRF_TRUSTED_ORIGINS = [
 ]
 
 # Additional CORS settings for Google OAuth
-CORS_ALLOW_ALL_ORIGINS = False
 CORS_ALLOWED_ORIGIN_REGEXES = [
     r"^https://accounts\.google\.com$",
 ]
@@ -146,6 +147,18 @@ CORS_ALLOW_HEADERS = [
     'cross-origin-opener-policy',
     'cache-control',
 ]
+
+CORS_ALLOW_METHODS = [
+    'GET',
+    'POST',
+    'PUT',
+    'PATCH',
+    'DELETE',
+    'OPTIONS'
+]
+
+# Additional settings to handle preflight requests
+CORS_PREFLIGHT_MAX_AGE = 86400
 
 # File upload settings
 FILE_UPLOAD_MAX_MEMORY_SIZE = 10 * 1024 * 1024  # 10MB
@@ -179,7 +192,10 @@ SOCIAL_AUTH_LOGIN_REDIRECT_URL = '/'
 SOCIAL_AUTH_LOGIN_URL = '/auth/login/google-oauth2/'
 
 # Email settings
+# Temporarily using console backend for debugging
+# Email settings
 EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+# EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'  # Switch back once Gmail is configured
 EMAIL_HOST = 'smtp.gmail.com'
 EMAIL_PORT = 587
 EMAIL_USE_TLS = True

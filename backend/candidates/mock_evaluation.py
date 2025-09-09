@@ -6,45 +6,80 @@ def mock_evaluate_candidate_answer(question: str, answer: str, resume_content: b
     """
     Mock evaluation function that returns a sample evaluation.
     Use this for testing when Gemini API key is not configured.
+    This version provides more realistic scoring based on answer quality indicators.
     """
     
-    # Simple scoring based on answer length and keywords
+    # Simple scoring based on answer length and content quality
     answer_length = len(answer.strip())
     question_length = len(question.strip())
     
-    # Basic scoring logic
-    if answer_length < 20:
-        base_score = 3
-    elif answer_length < 100:
-        base_score = 6
+    # Basic scoring logic - more realistic than before
+    if answer_length < 10:
+        base_score = 1  # Very short answers get very low scores
+    elif answer_length < 30:
+        base_score = 3  # Short answers get low scores
+    elif answer_length < 80:
+        base_score = 5  # Medium answers get medium scores
+    elif answer_length < 150:
+        base_score = 7  # Good length answers get good scores
     else:
-        base_score = 8
+        base_score = 8  # Very detailed answers get high base scores
     
-    # Check for technical keywords
+    # Check for technical keywords (positive indicators)
     technical_keywords = [
         'api', 'database', 'algorithm', 'data structure', 'programming',
         'software', 'system', 'architecture', 'framework', 'library',
-        'function', 'class', 'object', 'method', 'variable'
+        'function', 'class', 'object', 'method', 'variable', 'scalability',
+        'performance', 'security', 'testing', 'debugging', 'optimization'
+    ]
+    
+    # Check for poor quality indicators (negative indicators)
+    poor_indicators = [
+        'i don\'t know', 'not sure', 'maybe', 'i think so', 'probably',
+        'i guess', 'dunno', 'no idea', 'idk', 'um', 'uh', 'like'
     ]
     
     keyword_count = sum(1 for keyword in technical_keywords if keyword.lower() in answer.lower())
-    keyword_bonus = min(2, keyword_count * 0.2)
+    poor_indicator_count = sum(1 for indicator in poor_indicators if indicator.lower() in answer.lower())
     
-    final_score = min(10, base_score + keyword_bonus)
+    # Apply bonuses and penalties
+    keyword_bonus = min(2, keyword_count * 0.3)  # Up to 2 points for keywords
+    poor_penalty = min(3, poor_indicator_count * 0.8)  # Up to 3 points penalty for poor indicators
+    
+    # Check if answer is just gibberish or very repetitive
+    words = answer.lower().split()
+    if len(set(words)) < len(words) * 0.3 and len(words) > 5:  # Highly repetitive
+        repetitive_penalty = 2
+    else:
+        repetitive_penalty = 0
+    
+    # Calculate final score
+    final_score = base_score + keyword_bonus - poor_penalty - repetitive_penalty
+    final_score = max(1, min(10, final_score))  # Clamp between 1 and 10
+    
+    # Determine feedback based on score
+    if final_score >= 8:
+        quality_feedback = "High quality answer with good technical depth."
+    elif final_score >= 6:
+        quality_feedback = "Good answer but could be improved with more detail or technical accuracy."
+    elif final_score >= 4:
+        quality_feedback = "Average answer. Needs more depth and technical understanding."
+    else:
+        quality_feedback = "Poor answer. Lacks technical depth and understanding."
     
     return {
         "overall_score": round(final_score, 1),
         "detailed_scores": {
-            "technical_accuracy": round(final_score * 0.9, 1),
-            "relevance_to_question": round(final_score * 1.1, 1),
-            "depth_of_understanding": round(final_score * 0.8, 1),
-            "resume_alignment": round(final_score * 0.7, 1),
-            "communication_clarity": round(final_score * 1.0, 1),
-            "problem_solving_approach": round(final_score * 0.9, 1)
+            "technical_accuracy": round(max(1, final_score * 0.9 - poor_penalty * 0.5), 1),
+            "relevance_to_question": round(max(1, final_score * 1.0), 1),
+            "depth_of_understanding": round(max(1, final_score * 0.8 + keyword_bonus * 0.3), 1),
+            "resume_alignment": round(max(1, final_score * 0.7), 1),
+            "communication_clarity": round(max(1, final_score * 1.0 - repetitive_penalty), 1),
+            "problem_solving_approach": round(max(1, final_score * 0.9), 1)
         },
-        "feedback": f"Mock evaluation: This is a simulated evaluation score of {final_score}/10 based on answer length ({answer_length} characters) and technical keywords found ({keyword_count} keywords). To get real AI-powered evaluation, please configure your GEMINI_API_KEY.",
-        "strengths": f"Answer demonstrates understanding with {keyword_count} technical keywords identified.",
-        "areas_for_improvement": "Configure GEMINI_API_KEY for detailed AI-powered feedback.",
+        "feedback": f"Mock evaluation: {quality_feedback} Score: {final_score}/10 (Length: {answer_length} chars, Keywords: {keyword_count}, Quality issues: {poor_indicator_count}). Configure GEMINI_API_KEY for real AI evaluation.",
+        "strengths": f"Answer length: {answer_length} characters. Technical keywords found: {keyword_count}." + (" Good technical vocabulary used." if keyword_count > 2 else ""),
+        "areas_for_improvement": f"{'Avoid uncertainty phrases. ' if poor_indicator_count > 0 else ''}{'Reduce repetition. ' if repetitive_penalty > 0 else ''}Configure GEMINI_API_KEY for detailed AI-powered feedback.",
         "resume_insights": "Mock evaluation - resume analysis not available without GEMINI_API_KEY",
         "is_mock": True,
         "mock_reason": "GEMINI_API_KEY not configured"

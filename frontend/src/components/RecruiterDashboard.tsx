@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { GoogleLogin } from '@react-oauth/google';
+import { GoogleLogin, googleLogout } from '@react-oauth/google';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 
@@ -50,11 +50,101 @@ const RecruiterDashboard: React.FC = () => {
 
   const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000/api';
 
+  // Check if session has expired (24 hours timeout)
+  const isSessionExpired = () => {
+    const loginTime = localStorage.getItem('hireiq_login_time');
+    if (!loginTime) return true;
+    
+    const SESSION_TIMEOUT = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
+    const currentTime = Date.now();
+    const elapsedTime = currentTime - parseInt(loginTime);
+    
+    return elapsedTime > SESSION_TIMEOUT;
+  };
+
   useEffect(() => {
-    checkAuth();
+    // First, try to restore user from localStorage
+    const savedUser = localStorage.getItem('hireiq_user');
+    const isLoggedIn = localStorage.getItem('hireiq_logged_in');
+    
+    if (savedUser && isLoggedIn === 'true' && !isSessionExpired()) {
+      try {
+        const userData = JSON.parse(savedUser);
+        setUser(userData);
+        console.log('Restored user session from localStorage:', userData.email);
+        // Optionally verify the session is still valid
+        checkAuth();
+      } catch (error) {
+        console.error('Failed to restore user from localStorage:', error);
+        localStorage.removeItem('hireiq_user');
+        localStorage.removeItem('hireiq_logged_in');
+        localStorage.removeItem('hireiq_login_time');
+        checkAuth();
+      }
+    } else if (isSessionExpired()) {
+      console.log('Session has expired - clearing localStorage');
+      localStorage.removeItem('hireiq_user');
+      localStorage.removeItem('hireiq_logged_in');
+      localStorage.removeItem('hireiq_login_time');
+      checkAuth();
+    } else {
+      checkAuth();
+    }
+    
     // Get CSRF token from Django
     fetchCsrfToken();
+    
+    // Handle browser back/forward navigation - only logout if navigating away from recruiter
+    const handlePopState = () => {
+      // Only logout if we're actually navigating away from the recruiter dashboard
+      if (!window.location.pathname.includes('/recruiter')) {
+        console.log('Navigating away from recruiter dashboard - clearing auth state');
+        handleFullLogout();
+      }
+    };
+    
+    const handleVisibilityChange = () => {
+      // Don't do anything on visibility change - let user keep session active
+      // Refreshing data on tab switch can cause unnecessary API calls and potential logout
+      if (document.visibilityState === 'visible') {
+        console.log('Page is visible again - session maintained');
+        // Optional: Only refresh if user has been away for a long time
+        // fetchCandidates();
+      }
+    };
+    
+    const handleBeforeUnload = () => {
+      // Don't do anything on beforeunload - let user keep session
+      console.log('User is switching tabs or minimizing - keeping session active');
+    };
+    
+    window.addEventListener('popstate', handlePopState);
+    // Removed visibility change listener to prevent tab switching issues
+    // document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    
+    return () => {
+      window.removeEventListener('popstate', handlePopState);
+      // document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
   }, []);
+
+  // Helper function for complete logout
+  const handleFullLogout = () => {
+    try {
+      googleLogout();
+    } catch (error) {
+      console.log('Google logout error (non-critical):', error);
+    }
+    setUser(null);
+    setCandidates([]);
+    setMessage('');
+    setNewCandidateEmail('');
+    setHrPrompt('');
+    localStorage.clear();
+    sessionStorage.clear();
+  };
 
   const fetchCsrfToken = async () => {
     try {
@@ -111,12 +201,28 @@ const RecruiterDashboard: React.FC = () => {
     try {
       const response = await axios.get(`${API_BASE_URL}/auth/user/`, {
         withCredentials: true,
+        headers: {
+          'Cache-Control': 'no-cache',
+          'Pragma': 'no-cache'
+        }
       });
-      if (response.data.authenticated) {
+      if (response.data.authenticated && response.data.user) {
         setUser(response.data.user);
+        // Update localStorage with fresh user data
+        localStorage.setItem('hireiq_user', JSON.stringify(response.data.user));
+        localStorage.setItem('hireiq_logged_in', 'true');
+        console.log('User authenticated:', response.data.user.email);
+      } else {
+        console.log('User not authenticated - session may have expired');
+        // Clear localStorage if session is invalid
+        localStorage.removeItem('hireiq_user');
+        localStorage.removeItem('hireiq_logged_in');
+        setUser(null);
       }
     } catch (error) {
-      console.error('Auth check failed:', error);
+      console.error('Auth check failed - network or server error:', error);
+      // Don't clear localStorage on network errors, just log the error
+      // The user can still try to re-authenticate manually
     }
   };
 
@@ -137,6 +243,11 @@ const RecruiterDashboard: React.FC = () => {
 
       if (response.data.success) {
         setUser(response.data.user);
+        // Store user session in localStorage for persistence across tabs/refreshes
+        localStorage.setItem('hireiq_user', JSON.stringify(response.data.user));
+        localStorage.setItem('hireiq_logged_in', 'true');
+        // Store login timestamp for session timeout handling
+        localStorage.setItem('hireiq_login_time', Date.now().toString());
         setMessage('Successfully logged in!');
         // Clear any previous error messages
         setTimeout(() => setMessage(''), 3000);
@@ -145,12 +256,23 @@ const RecruiterDashboard: React.FC = () => {
       console.error('Login failed:', error);
       console.error('Error response:', error.response?.data);
       
+      // Logout from Google OAuth if login fails
+      googleLogout();
+      setUser(null);
+      
       if (error.response?.data?.error) {
         setMessage(`Login failed: ${error.response.data.error}`);
       } else {
         setMessage('Login failed. Please try again.');
       }
     }
+  };
+
+  const handleGoogleLoginError = () => {
+    console.log('Google login error or cancelled by user');
+    googleLogout();
+    setUser(null);
+    setMessage('Google login was cancelled or failed. Please try again.');
   };
 
   const fetchCandidates = async () => {
@@ -167,8 +289,9 @@ const RecruiterDashboard: React.FC = () => {
     } catch (error: any) {
       console.error('Failed to fetch candidates:', error);
       if (error.response?.status === 401) {
-        // Session expired, redirect to login
-        setUser(null);
+        // Only clear user state if this was a deliberate action, not on background refresh
+        console.log('401 error while fetching candidates - session may have expired');
+        // Don't auto-logout, just show empty list
         setCandidates([]);
       }
     }
@@ -201,6 +324,18 @@ const RecruiterDashboard: React.FC = () => {
     e.preventDefault();
     if (!newCandidateEmail.trim()) return;
 
+    // Check if THIS recruiter has already invited this candidate
+    const existingCandidate = candidates.find(
+      candidate => candidate.email.toLowerCase() === newCandidateEmail.trim().toLowerCase()
+    );
+    
+    if (existingCandidate) {
+      setMessage(`❌ You have already invited candidate "${newCandidateEmail}". Please check your candidates list.`);
+      // Clear message after 6 seconds
+      setTimeout(() => setMessage(''), 6000);
+      return;
+    }
+
     setLoading(true);
     try {
       const csrfToken = getCsrfToken();
@@ -218,10 +353,15 @@ const RecruiterDashboard: React.FC = () => {
       setCandidates([response.data, ...candidates]);
       setNewCandidateEmail('');
       setHrPrompt('');
-      setMessage('Candidate added successfully! Email sent.');
+      setMessage('✅ Candidate added successfully! Email notification sent.');
+      // Clear success message after 5 seconds
+      setTimeout(() => setMessage(''), 5000);
     } catch (error: any) {
       console.error('Failed to add candidate:', error);
-      setMessage(error.response?.data?.error || 'Failed to add candidate');
+      const errorMessage = error.response?.data?.error || 'Failed to add candidate';
+      setMessage(`❌ ${errorMessage}`);
+      // Clear error message after 8 seconds (longer for errors so user can read)
+      setTimeout(() => setMessage(''), 8000);
     } finally {
       setLoading(false);
     }
@@ -229,28 +369,25 @@ const RecruiterDashboard: React.FC = () => {
 
   const handleLogout = async () => {
     try {
+      console.log('Initiating logout process');
+      
+      // First, logout from Google OAuth
+      googleLogout();
+      console.log('Google OAuth logout completed');
+      
+      // Then logout from Django backend
       await axios.post(`${API_BASE_URL}/auth/logout/`, {}, {
         withCredentials: true,
       });
+      console.log('Backend logout completed');
       
-      // Clear local state
-      setUser(null);
-      setCandidates([]);
-      setMessage('');
-      setNewCandidateEmail('');
-      setHrPrompt('');
-      
-      // Redirect to home page
-      navigate('/');
     } catch (error) {
-      console.error('Logout failed:', error);
-      // Even if logout fails on backend, clear frontend state and redirect
-      setUser(null);
-      setCandidates([]);
-      setMessage('');
-      setNewCandidateEmail('');
-      setHrPrompt('');
-      navigate('/');
+      console.error('Backend logout failed:', error);
+    } finally {
+      // Always clear frontend state regardless of backend response
+      handleFullLogout();
+      console.log('Full logout completed - redirecting to home');
+      navigate('/', { replace: true }); // Use replace to prevent back navigation
     }
   };
 
@@ -269,20 +406,20 @@ const RecruiterDashboard: React.FC = () => {
           </div>
           
           <div className="flex justify-center mb-4">
-            <GoogleLogin
-              onSuccess={handleGoogleLogin}
-              onError={() => {
-                console.error('Google Login failed');
-                setMessage('Google Login failed. Please try again.');
-              }}
-              useOneTap={false}
-              theme="outline"
-              size="large"
-              shape="rectangular"
-              width="300"
-              auto_select={false}
-              cancel_on_tap_outside={true}
-            />
+            <div id="google-login-container">
+              <GoogleLogin
+                onSuccess={handleGoogleLogin}
+                onError={handleGoogleLoginError}
+                useOneTap={false}
+                theme="outline"
+                size="large"
+                shape="rectangular"
+                width="300"
+                auto_select={false}
+                cancel_on_tap_outside={true}
+                prompt_parent_id="google-login-container"
+              />
+            </div>
           </div>
           
           {message && (
@@ -324,7 +461,11 @@ const RecruiterDashboard: React.FC = () => {
 
       <div className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
         {message && (
-          <div className="mb-4 p-3 bg-green-100 border border-green-400 text-green-700 rounded">
+          <div className={`mb-4 p-3 rounded ${
+            message.includes('✅') || message.includes('Successfully') || message.includes('successfully')
+              ? 'bg-green-100 border border-green-400 text-green-700'
+              : 'bg-red-100 border border-red-400 text-red-700'
+          }`}>
             {message}
           </div>
         )}

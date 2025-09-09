@@ -10,11 +10,14 @@ from django.http import JsonResponse
 import json
 import base64
 
+@csrf_exempt
 @api_view(['POST'])
 @permission_classes([AllowAny])
-@csrf_exempt
 def google_auth(request):
     try:
+        print(f"Google auth request received: {request.method}")
+        print(f"Request headers: {dict(request.headers)}")
+        
         data = json.loads(request.body)
         token = data.get('token')
         
@@ -114,6 +117,7 @@ def google_auth(request):
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
 
+@csrf_exempt  # Allow logout without CSRF token for better UX
 @api_view(['POST'])
 def logout_view(request):
     try:
@@ -126,30 +130,50 @@ def logout_view(request):
         if hasattr(request, 'session'):
             request.session.flush()
         
-        response = Response({'success': True}, status=status.HTTP_200_OK)
+        response = Response({'success': True, 'message': 'Logged out successfully'}, status=status.HTTP_200_OK)
         
         # Clear any authentication cookies
-        response.delete_cookie('sessionid')
-        response.delete_cookie('csrftoken')
+        response.delete_cookie('sessionid', path='/', domain=None)
+        response.delete_cookie('csrftoken', path='/', domain=None)
         
+        # Set cache-control headers to prevent caching
+        response['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+        response['Pragma'] = 'no-cache'
+        response['Expires'] = '0'
+        
+        print("Logout completed successfully")
         return response
     except Exception as e:
         print(f"Logout error: {str(e)}")
-        return Response({'success': True}, status=status.HTTP_200_OK)  # Return success even if error
+        response = Response({'success': True, 'message': 'Logged out successfully'}, status=status.HTTP_200_OK)
+        response['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+        response['Pragma'] = 'no-cache' 
+        response['Expires'] = '0'
+        return response
 
 @api_view(['GET'])
 @permission_classes([AllowAny])
+@csrf_exempt
 def user_info(request):
+    print(f"🔍 USER_INFO REQUEST - Session key: {request.session.session_key}")
+    print(f"🔍 User authenticated: {request.user.is_authenticated}")
+    print(f"🔍 User: {request.user}")
+    print(f"🔍 Request headers: {dict(request.headers)}")
+    print(f"🔍 Session data: {dict(request.session)}")
+    
     if request.user.is_authenticated:
-        return Response({
+        user_data = {
             'authenticated': True,
             'user': {
                 'id': request.user.id,
                 'email': request.user.email,
                 'name': f"{request.user.first_name} {request.user.last_name}".strip(),
             }
-        })
+        }
+        print(f"✅ Returning authenticated user: {user_data}")
+        return Response(user_data)
     else:
+        print("❌ User not authenticated - returning false")
         return Response({'authenticated': False})
 
 @ensure_csrf_cookie

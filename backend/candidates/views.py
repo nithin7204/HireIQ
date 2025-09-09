@@ -8,6 +8,7 @@ from django.core.mail import send_mail
 from django.conf import settings
 from django.http import HttpResponse
 from mongoengine.errors import DoesNotExist, ValidationError
+from datetime import datetime
 import os
 import uuid
 from datetime import datetime
@@ -27,21 +28,16 @@ class CandidateListCreateView(generics.ListCreateAPIView):
     def get_queryset(self):
         try:
             user_id = str(self.request.user.id)
-            print(f"Fetching candidates for user ID: {user_id}")
             
             # Get candidates created by the current user
             candidates = Candidate.objects.filter(created_by_id=user_id)
-            print(f"Found {len(candidates)} candidates")
             
             return candidates
         except Exception as e:
-            print(f"Error fetching candidates: {str(e)}")
             return []
     
     def list(self, request, *args, **kwargs):
         try:
-            print(f"List request from user: {request.user.email if request.user.is_authenticated else 'Anonymous'}")
-            
             if not request.user.is_authenticated:
                 return Response(
                     {'error': 'Authentication required'}, 
@@ -50,16 +46,12 @@ class CandidateListCreateView(generics.ListCreateAPIView):
             
             queryset = self.get_queryset()
             
-            # Check each candidate for auto-evaluation opportunities
-            for candidate in queryset:
-                check_and_auto_evaluate(candidate)
+            # Disable auto-evaluation during list to prevent inconsistencies during debugging
             
             serializer = CandidateSerializer(queryset, many=True)
             
-            print(f"Returning {len(serializer.data)} candidates")
             return Response(serializer.data)
         except Exception as e:
-            print(f"List error: {str(e)}")
             return Response(
                 {'error': 'Failed to fetch candidates'}, 
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
@@ -69,6 +61,21 @@ class CandidateListCreateView(generics.ListCreateAPIView):
         serializer = self.get_serializer(data=request.data, context={'request': request})
         if serializer.is_valid():
             try:
+                # Check if this recruiter has already invited this candidate
+                user_id = str(request.user.id)
+                candidate_email = serializer.validated_data['email']
+                
+                existing_candidate = Candidate.objects.filter(
+                    email=candidate_email,
+                    created_by_id=user_id
+                ).first()
+                
+                if existing_candidate:
+                    return Response(
+                        {'error': f'You have already invited candidate "{candidate_email}". Please check your candidates list.'}, 
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
+                
                 candidate = serializer.save()
                 
                 # Send email to candidate with their ID
@@ -80,14 +87,14 @@ You have been invited to participate in the HireIQ interview process.
 
 Your Candidate ID is: {candidate.candidate_id}
 
-Please use this ID to access the interview portal.
+Please use this ID to access the interview portal at: http://localhost:3000/candidate
 
 Best regards,
 HireIQ Team
                 '''
                 
                 try:
-                    send_mail(
+                    result = send_mail(
                         subject,
                         message,
                         settings.EMAIL_HOST_USER,
@@ -96,20 +103,22 @@ HireIQ Team
                     )
                 except Exception as e:
                     # Log the error but don't fail the creation
-                    print(f"Failed to send email: {e}")
+                    pass  # Email failure shouldn't prevent candidate creation
                 
                 return Response(
                     CandidateSerializer(candidate).data, 
                     status=status.HTTP_201_CREATED
                 )
             except ValidationError as e:
+                error_message = str(e)
                 return Response(
-                    {'error': f'Validation error: {str(e)}'}, 
+                    {'error': f'Validation error: {error_message}'}, 
                     status=status.HTTP_400_BAD_REQUEST
                 )
             except Exception as e:
+                error_message = str(e)
                 return Response(
-                    {'error': f'Failed to create candidate: {str(e)}'}, 
+                    {'error': f'Failed to create candidate: {error_message}'}, 
                     status=status.HTTP_500_INTERNAL_SERVER_ERROR
                 )
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
@@ -335,122 +344,6 @@ def download_resume(request, candidate_id):
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
 
-@api_view(['POST'])
-@permission_classes([])
-def generate_interview_questions(request):
-    """
-    Expects POST data:
-    - resume: PDF file (multipart/form-data)
-    - HR_prompt: HR prompt string
-    - company: Company name
-    - role: Role name
-    """
-    resume_file = request.FILES.get("resume")
-    HR_prompt = request.data.get("HR_prompt")
-    company = request.data.get("company")
-    role = request.data.get("role")
-
-    if not all([resume_file, HR_prompt, company, role]):
-        return Response({"error": "Missing required fields."}, status=status.HTTP_400_BAD_REQUEST)
-
-    try:
-        # Check if API keys are configured
-        import os
-        if not os.getenv("GROQ_API_KEY") or os.getenv("GROQ_API_KEY") == "your_groq_api_key_here":
-            return Response({
-                "error": "GROQ_API_KEY not configured. Please add your API key to the .env file.",
-                "setup_instructions": "Get your GROQ API key from https://console.groq.com/keys"
-            }, status=status.HTTP_501_NOT_IMPLEMENTED)
-        
-        if not os.getenv("PERPLEXITY_API_KEY") or os.getenv("PERPLEXITY_API_KEY") == "your_perplexity_api_key_here":
-            return Response({
-                "error": "PERPLEXITY_API_KEY not configured. Please add your API key to the .env file.",
-                "setup_instructions": "Get your Perplexity API key from https://www.perplexity.ai/settings/api"
-            }, status=status.HTTP_501_NOT_IMPLEMENTED)
-        
-        from candidates.ml_models.questions import get_questions
-        questions = get_questions(resume_file, HR_prompt, company, role)
-        return Response({"questions": questions}, status=status.HTTP_200_OK)
-    except Exception as e:
-        import traceback
-        print(f"Error generating questions: {str(e)}")
-        traceback.print_exc()
-        return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-@api_view(['POST'])
-@permission_classes([])
-def generate_candidate_questions(request):
-    """
-    Generate questions for a specific candidate using their uploaded resume.
-    Expects POST data:
-    - candidate_id: Candidate ID
-    - HR_prompt: HR prompt string
-    - company: Company name
-    - role: Role name
-    """
-    candidate_id = request.data.get("candidate_id")
-    HR_prompt = request.data.get("HR_prompt")
-    company = request.data.get("company")
-    role = request.data.get("role")
-
-    if not all([candidate_id, HR_prompt, company, role]):
-        return Response({"error": "Missing required fields."}, status=status.HTTP_400_BAD_REQUEST)
-
-    try:
-        # Get candidate
-        candidate = Candidate.objects.get(candidate_id=candidate_id, is_active=True)
-        
-        if not candidate.resume_data:
-            return Response(
-                {'error': 'No resume found for this candidate'}, 
-                status=status.HTTP_404_NOT_FOUND
-            )
-        
-        # Check if API keys are configured
-        import os
-        if not os.getenv("GROQ_API_KEY") or os.getenv("GROQ_API_KEY") == "your_groq_api_key_here":
-            return Response({
-                "error": "GROQ_API_KEY not configured. Please add your API key to the .env file.",
-                "setup_instructions": "Get your GROQ API key from https://console.groq.com/keys"
-            }, status=status.HTTP_501_NOT_IMPLEMENTED)
-        
-        if not os.getenv("PERPLEXITY_API_KEY") or os.getenv("PERPLEXITY_API_KEY") == "your_perplexity_api_key_here":
-            return Response({
-                "error": "PERPLEXITY_API_KEY not configured. Please add your API key to the .env file.",
-                "setup_instructions": "Get your Perplexity API key from https://www.perplexity.ai/settings/api"
-            }, status=status.HTTP_501_NOT_IMPLEMENTED)
-        
-        # Create a file-like object from binary data
-        import io
-        resume_file = io.BytesIO(candidate.resume_data)
-        resume_file.name = candidate.resume_filename or f"{candidate_id}_resume.pdf"
-        
-        from candidates.ml_models.questions import get_questions
-        questions = get_questions(resume_file, HR_prompt, company, role)
-        
-        # Save questions to candidate record
-        candidate.company = company
-        candidate.role = role
-        candidate.hr_prompt = HR_prompt
-        candidate.interview_questions = questions
-        candidate.save()
-        
-        return Response({
-            "questions": questions,
-            "candidate": CandidateSerializer(candidate).data
-        }, status=status.HTTP_200_OK)
-        
-    except DoesNotExist:
-        return Response(
-            {'error': 'Invalid candidate ID'}, 
-            status=status.HTTP_404_NOT_FOUND
-        )
-    except Exception as e:
-        import traceback
-        print(f"Error generating questions: {str(e)}")
-        traceback.print_exc()
-        return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
 @api_view(['GET'])
 @permission_classes([])
 def get_candidate_questions(request, candidate_id):
@@ -673,27 +566,7 @@ def auto_evaluate_candidate(candidate_id):
         
         if not evaluations:
             print(f"No valid question-answer pairs found for candidate {candidate_id}")
-            # Create mock evaluation based on completion if candidate has audio responses
-            if candidate.audio_responses and len(candidate.audio_responses) > 0:
-                completion_score = min(len(candidate.audio_responses) * 2, 10)  # 2 points per response, max 10
-                rating = 'Good' if completion_score >= 6 else 'Average' if completion_score >= 4 else 'Needs Improvement'
-                
-                candidate.evaluation_score = str(completion_score)
-                candidate.evaluation_rating = rating
-                candidate.evaluation_data = {
-                    'total_questions': len(candidate.audio_responses),
-                    'successful_evaluations': 0,
-                    'failed_evaluations': len(candidate.audio_responses),
-                    'average_score': completion_score,
-                    'overall_rating': rating,
-                    'auto_generated': True,
-                    'evaluation_type': 'completion_based',
-                    'evaluation_timestamp': datetime.utcnow().isoformat(),
-                    'note': 'Evaluation based on interview completion - transcriptions not available'
-                }
-                candidate.evaluation_timestamp = datetime.utcnow()
-                candidate.save()
-                print(f"Mock evaluation completed for candidate {candidate_id}: {completion_score}/10 ({rating})")
+            # Don't create fake scores - candidate needs to complete proper interview first
             return
         
         # Process evaluations
@@ -759,108 +632,6 @@ def auto_evaluate_candidate(candidate_id):
 
 @api_view(['POST'])
 @permission_classes([])
-def save_audio_response(request):
-    """
-    Save audio response for a candidate.
-    Expects POST data:
-    - candidate_id: Candidate ID
-    - question_id: Question identifier
-    - question_text: The question text
-    - audio_data: Base64 encoded audio data
-    - transcription: Text transcription of the audio
-    - duration: Duration of the recording in seconds
-    """
-    candidate_id = request.data.get("candidate_id")
-    question_id = request.data.get("question_id")
-    question_text = request.data.get("question_text")
-    audio_data = request.data.get("audio_data")
-    transcription = request.data.get("transcription")
-    duration = request.data.get("duration")
-
-    if not all([candidate_id, question_id, question_text, audio_data]):
-        return Response({"error": "Missing required fields."}, status=status.HTTP_400_BAD_REQUEST)
-
-    try:
-        candidate = Candidate.objects.get(candidate_id=candidate_id, is_active=True)
-        
-        # Create audio response entry
-        audio_response = {
-            "question_id": question_id,
-            "question_text": question_text,
-            "audio_data": audio_data,
-            "transcription": transcription or "",
-            "duration": duration or 0,
-            "timestamp": datetime.utcnow().isoformat()
-        }
-        
-        # Initialize audio_responses if it doesn't exist
-        if not candidate.audio_responses:
-            candidate.audio_responses = []
-        
-        # Check if response for this question already exists and update it
-        existing_index = None
-        for i, response in enumerate(candidate.audio_responses):
-            if response.get("question_id") == question_id:
-                existing_index = i
-                break
-        
-        if existing_index is not None:
-            candidate.audio_responses[existing_index] = audio_response
-        else:
-            candidate.audio_responses.append(audio_response)
-        
-        candidate.save()
-        
-        # Check if interview is completed and automatically trigger evaluation
-        interview_completed = check_and_auto_evaluate(candidate)
-        
-        return Response({
-            "message": "Audio response saved successfully",
-            "response_count": len(candidate.audio_responses),
-            "interview_completed": interview_completed,
-            "auto_evaluation_triggered": interview_completed and not candidate.evaluation_score
-        }, status=status.HTTP_200_OK)
-        
-    except DoesNotExist:
-        return Response(
-            {'error': 'Invalid candidate ID'}, 
-            status=status.HTTP_404_NOT_FOUND
-        )
-    except Exception as e:
-        import traceback
-        print(f"Error saving audio response: {str(e)}")
-        traceback.print_exc()
-        return Response(
-            {'error': f'Failed to save audio response: {str(e)}'}, 
-            status=status.HTTP_500_INTERNAL_SERVER_ERROR
-        )
-
-@api_view(['GET'])
-@permission_classes([])
-def get_candidate_responses(request, candidate_id):
-    """
-    Get all audio responses for a candidate.
-    """
-    try:
-        candidate = Candidate.objects.get(candidate_id=candidate_id, is_active=True)
-        
-        return Response({
-            "responses": candidate.audio_responses or [],
-            "candidate": CandidateSerializer(candidate).data
-        }, status=status.HTTP_200_OK)
-        
-    except DoesNotExist:
-        return Response(
-            {'error': 'Invalid candidate ID'}, 
-            status=status.HTTP_404_NOT_FOUND
-        )
-    except Exception as e:
-        return Response(
-            {'error': f'Failed to get responses: {str(e)}'}, 
-            status=status.HTTP_500_INTERNAL_SERVER_ERROR
-        )
-@api_view(['POST'])
-@permission_classes([])
 def transcribe_audio_view(request):
     """
     Accepts an uploaded audio file and returns its transcription.
@@ -878,7 +649,9 @@ def transcribe_audio_view(request):
     print(f"DEBUG: Audio file: {audio_file.name}, Size: {audio_file.size} bytes")
     
     try:
+        print(f"DEBUG: About to call transcribe_audio with service: {service}")
         text = transcribe_audio(audio_file, service=service)
+        print(f"DEBUG: Transcription completed successfully, length: {len(text) if text else 0}")
         return Response({
             'transcription': text,
             'service_used': service,
@@ -907,235 +680,147 @@ def transcribe_audio_view(request):
 
 @api_view(['POST'])
 @permission_classes([])
-def evaluate_candidate_answer(request):
+def save_audio_response(request):
     """
-    Evaluate a candidate's answer using Gemini AI.
-    
-    Expects POST data:
-    - question: The interview question (required)
-    - answer: The candidate's answer (required)
-    - candidate_id: ID of the candidate (required) - used to get resume
-    
-    Returns:
-    - overall_score: Score from 1-10
-    - detailed_scores: Breakdown of scores by category
-    - feedback: Detailed feedback
-    - strengths: Key strengths
-    - areas_for_improvement: Areas to improve
-    - resume_insights: How answer aligns with resume
+    Save audio response for a candidate.
     """
     try:
-        from .ml_models.evaluate import evaluate_candidate_answer as eval_function
-        from .gridfs_models import get_resume_content
-        
-        # Get request data
-        data = request.data
-        question = data.get('question', '').strip()
-        answer = data.get('answer', '').strip()
-        candidate_id = data.get('candidate_id', '').strip()
-        
-        # Validate required fields
-        if not question:
+        candidate_id = request.data.get("candidate_id")
+        question_id = request.data.get("question_id")
+        question_text = request.data.get("question_text")
+        audio_data = request.data.get("audio_data")
+        transcription = request.data.get("transcription")
+        duration = request.data.get("duration")
+
+        if not all([candidate_id, question_id, question_text]):
             return Response(
-                {'error': 'Question is required'}, 
+                {"error": "Missing required fields: candidate_id, question_id, question_text"}, 
                 status=status.HTTP_400_BAD_REQUEST
             )
+
+        # Find candidate
+        candidate = Candidate.objects.get(candidate_id=candidate_id, is_active=True)
         
-        if not answer:
-            return Response(
-                {'error': 'Answer is required'}, 
-                status=status.HTTP_400_BAD_REQUEST
-            )
+        # Initialize audio_responses if it doesn't exist
+        if not candidate.audio_responses:
+            candidate.audio_responses = []
         
+        response_data = {
+            "question_id": question_id,
+            "question_text": question_text,
+            "audio_data": audio_data,
+            "transcription": transcription or "",
+            "duration": duration or 0,
+            "timestamp": datetime.utcnow().isoformat()
+        }
+        
+        # Check if response already exists for this question and update it
+        existing_index = None
+        for i, response in enumerate(candidate.audio_responses):
+            if response.get("question_id") == question_id:
+                existing_index = i
+                break
+        
+        if existing_index is not None:
+            candidate.audio_responses[existing_index] = response_data
+        else:
+            candidate.audio_responses.append(response_data)
+        
+        candidate.save()
+        
+        # Check if interview is completed and trigger auto-evaluation if needed
+        try:
+            check_and_auto_evaluate(candidate)
+        except Exception as e:
+            print(f"Error checking auto-evaluation for candidate {candidate_id}: {str(e)}")
+        
+        return Response({
+            "message": "Audio response saved successfully",
+            "response_count": len(candidate.audio_responses)
+        }, status=status.HTTP_200_OK)
+        
+    except Candidate.DoesNotExist:
+        return Response(
+            {'error': 'Invalid candidate ID'}, 
+            status=status.HTTP_404_NOT_FOUND
+        )
+    except Exception as e:
+        return Response(
+            {'error': f'Failed to save audio response: {str(e)}'}, 
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def manual_evaluate_candidate(request):
+    """
+    Manually trigger evaluation for a candidate.
+    Used by recruiters to force evaluation when auto-evaluation fails.
+    """
+    try:
+        candidate_id = request.data.get('candidate_id')
         if not candidate_id:
             return Response(
-                {'error': 'Candidate ID is required'}, 
+                {'error': 'candidate_id is required'}, 
                 status=status.HTTP_400_BAD_REQUEST
             )
         
-        # Get candidate resume
+        # Check if candidate exists
         try:
-            resume_content = get_resume_content(candidate_id)
-            if not resume_content:
-                return Response(
-                    {'error': 'Resume not found for this candidate'}, 
-                    status=status.HTTP_404_NOT_FOUND
-                )
-        except Exception as e:
-            print(f"Error getting resume: {str(e)}")
+            candidate = Candidate.objects.get(candidate_id=candidate_id, is_active=True)
+        except Candidate.DoesNotExist:
             return Response(
-                {'error': 'Could not retrieve candidate resume'}, 
+                {'error': 'Candidate not found'}, 
                 status=status.HTTP_404_NOT_FOUND
             )
         
-        # Evaluate the answer
+        # Check if candidate has completed interview
+        if not candidate.interview_questions:
+            return Response(
+                {'error': 'Candidate has no interview questions'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        if not candidate.audio_responses:
+            return Response(
+                {'error': 'Candidate has no audio responses'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        total_questions = len(candidate.interview_questions)
+        response_count = len(candidate.audio_responses)
+        
+        if response_count < total_questions:
+            return Response(
+                {'error': f'Interview not completed. {response_count}/{total_questions} questions answered'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Trigger evaluation
         try:
-            print(f"Starting evaluation for candidate: {candidate_id}")
-            print(f"Question length: {len(question)}")
-            print(f"Answer length: {len(answer)}")
-            print(f"Resume content size: {len(resume_content)} bytes")
+            from threading import Thread
+            thread = Thread(target=auto_evaluate_candidate, args=(candidate_id,))
+            thread.daemon = True
+            thread.start()
             
-            evaluation_result = eval_function(question, answer, resume_content)
-            print(f"Evaluation result type: {type(evaluation_result)}")
-            print(f"Evaluation result keys: {list(evaluation_result.keys()) if isinstance(evaluation_result, dict) else 'Not a dict'}")
-            
-            # Check if evaluation was successful
-            if evaluation_result.get('error'):
-                error_message = evaluation_result.get('message', 'Unknown error')
-                print(f"Evaluation failed with error: {error_message}")
-                return Response(
-                    {
-                        'error': 'Evaluation failed',
-                        'details': error_message,
-                        'debug_info': {
-                            'result_keys': list(evaluation_result.keys()) if isinstance(evaluation_result, dict) else None,
-                            'result_type': str(type(evaluation_result))
-                        }
-                    }, 
-                    status=status.HTTP_500_INTERNAL_SERVER_ERROR
-                )
-            
-            # Return successful evaluation
             return Response({
-                'success': True,
-                'evaluation': evaluation_result,
+                'message': 'Evaluation triggered successfully',
                 'candidate_id': candidate_id,
-                'question': question[:100] + '...' if len(question) > 100 else question  # Truncate for response
+                'questions_count': total_questions,
+                'responses_count': response_count
             }, status=status.HTTP_200_OK)
             
         except Exception as e:
-            print(f"Error during evaluation: {str(e)}")
-            import traceback
-            traceback.print_exc()
             return Response(
-                {
-                    'error': f'Evaluation processing failed: {str(e)}',
-                    'error_type': str(type(e).__name__),
-                    'traceback': traceback.format_exc()
-                }, 
+                {'error': f'Failed to trigger evaluation: {str(e)}'}, 
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
-    
+            
     except Exception as e:
-        print(f"Unexpected error in evaluate_candidate_answer: {str(e)}")
         return Response(
-            {'error': f'Server error: {str(e)}'}, 
+            {'error': f'Manual evaluation failed: {str(e)}'}, 
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
-
-
-@api_view(['POST'])
-@permission_classes([])
-def batch_evaluate_answers(request):
-    """
-    Evaluate multiple answers at once.
-    
-    Expects POST data:
-    - candidate_id: ID of the candidate (required)
-    - evaluations: List of {question, answer} pairs (required)
-    
-    Returns:
-    - results: List of evaluation results
-    - summary: Overall evaluation summary
-    """
-    try:
-        from .ml_models.evaluate import evaluate_candidate_answer as eval_function
-        from .gridfs_models import get_resume_content
-        
-        # Get request data
-        data = request.data
-        candidate_id = data.get('candidate_id', '').strip()
-        evaluations = data.get('evaluations', [])
-        
-        # Validate required fields
-        if not candidate_id:
-            return Response(
-                {'error': 'Candidate ID is required'}, 
-                status=status.HTTP_400_BAD_REQUEST
-            )
-        
-        if not evaluations or not isinstance(evaluations, list):
-            return Response(
-                {'error': 'Evaluations list is required'}, 
-                status=status.HTTP_400_BAD_REQUEST
-            )
-        
-        # Get candidate resume once
-        try:
-            resume_content = get_resume_content(candidate_id)
-            if not resume_content:
-                return Response(
-                    {'error': 'Resume not found for this candidate'}, 
-                    status=status.HTTP_404_NOT_FOUND
-                )
-        except Exception as e:
-            return Response(
-                {'error': 'Could not retrieve candidate resume'}, 
-                status=status.HTTP_404_NOT_FOUND
-            )
-        
-        # Process each evaluation
-        results = []
-        total_score = 0
-        successful_evaluations = 0
-        
-        for idx, evaluation in enumerate(evaluations):
-            question = evaluation.get('question', '').strip()
-            answer = evaluation.get('answer', '').strip()
-            
-            if not question or not answer:
-                results.append({
-                    'index': idx,
-                    'error': 'Question and answer are required',
-                    'question': question[:50] + '...' if len(question) > 50 else question
-                })
-                continue
-            
-            try:
-                evaluation_result = eval_function(question, answer, resume_content)
-                
-                if not evaluation_result.get('error'):
-                    total_score += evaluation_result.get('overall_score', 0)
-                    successful_evaluations += 1
-                
-                results.append({
-                    'index': idx,
-                    'question': question[:100] + '...' if len(question) > 100 else question,
-                    'evaluation': evaluation_result
-                })
-                
-            except Exception as e:
-                results.append({
-                    'index': idx,
-                    'error': f'Evaluation failed: {str(e)}',
-                    'question': question[:50] + '...' if len(question) > 50 else question
-                })
-        
-        # Calculate summary
-        average_score = total_score / successful_evaluations if successful_evaluations > 0 else 0
-        
-        summary = {
-            'total_questions': len(evaluations),
-            'successful_evaluations': successful_evaluations,
-            'failed_evaluations': len(evaluations) - successful_evaluations,
-            'average_score': round(average_score, 2),
-            'overall_rating': 'Excellent' if average_score >= 8 else 'Good' if average_score >= 6 else 'Average' if average_score >= 4 else 'Needs Improvement'
-        }
-        
-        return Response({
-            'success': True,
-            'candidate_id': candidate_id,
-            'results': results,
-            'summary': summary
-        }, status=status.HTTP_200_OK)
-        
-    except Exception as e:
-        print(f"Unexpected error in batch_evaluate_answers: {str(e)}")
-        return Response(
-            {'error': f'Server error: {str(e)}'}, 
-            status=status.HTTP_500_INTERNAL_SERVER_ERROR
-        )
-
 
 @api_view(['POST'])
 @permission_classes([])
@@ -1311,6 +996,10 @@ def manual_evaluate_candidate(request):
         data = request.data
         candidate_id = data.get('candidate_id', '').strip()
         
+        print(f"🔧 MANUAL EVALUATION REQUEST")
+        print(f"   User: {request.user.email if hasattr(request.user, 'email') else request.user.username}")
+        print(f"   Candidate ID: {candidate_id}")
+        
         # Validate required fields
         if not candidate_id:
             return Response(
@@ -1320,6 +1009,10 @@ def manual_evaluate_candidate(request):
         
         try:
             candidate = Candidate.objects.get(candidate_id=candidate_id, is_active=True)
+            
+            print(f"   📋 Found candidate: {candidate.email}")
+            print(f"   📊 Current Score: {candidate.evaluation_score}")
+            print(f"   ⭐ Current Rating: {candidate.evaluation_rating}")
             
             # Check if candidate belongs to the current user
             if candidate.created_by_id != str(request.user.id):
@@ -1336,20 +1029,26 @@ def manual_evaluate_candidate(request):
         
         # Check if candidate has audio responses
         if not candidate.audio_responses:
+            print(f"   ❌ No audio responses found")
             return Response(
                 {'error': 'No interview responses found for this candidate'}, 
                 status=status.HTTP_404_NOT_FOUND
             )
         
+        print(f"   🎤 Audio responses found: {len(candidate.audio_responses)}")
+        
         # Get candidate resume
         try:
             resume_content = get_resume_content(candidate_id)
             if not resume_content:
+                print(f"   ❌ No resume content found")
                 return Response(
                     {'error': 'Resume not found for this candidate'}, 
                     status=status.HTTP_404_NOT_FOUND
                 )
+            print(f"   📄 Resume content found: {len(resume_content)} characters")
         except Exception as e:
+            print(f"   ❌ Resume retrieval error: {e}")
             return Response(
                 {'error': 'Could not retrieve candidate resume'}, 
                 status=status.HTTP_404_NOT_FOUND
@@ -1357,9 +1056,12 @@ def manual_evaluate_candidate(request):
         
         # Check for valid transcriptions first
         valid_transcriptions = []
-        for response in candidate.audio_responses:
+        print(f"   🔍 Checking transcriptions...")
+        for i, response in enumerate(candidate.audio_responses):
             question = response.get('question_text', '').strip()
             transcription = response.get('transcription', '').strip()
+            
+            print(f"      Response {i+1}: Q={len(question)} chars, T={len(transcription)} chars")
             
             if question and transcription:
                 valid_transcriptions.append({
@@ -1367,39 +1069,20 @@ def manual_evaluate_candidate(request):
                     'answer': transcription
                 })
         
-        # If no valid transcriptions, provide mock evaluation based on completion
+        print(f"   ✅ Valid transcriptions: {len(valid_transcriptions)}")
+        
+        # If no valid transcriptions, don't create fake scores
         if not valid_transcriptions:
-            # Create a mock evaluation based on completion
-            completion_score = min(len(candidate.audio_responses) * 2, 10)  # 2 points per response, max 10
-            rating = 'Good' if completion_score >= 6 else 'Average' if completion_score >= 4 else 'Needs Improvement'
-            
-            summary = {
-                'total_questions': len(candidate.audio_responses),
-                'successful_evaluations': 0,
-                'failed_evaluations': len(candidate.audio_responses),
-                'average_score': completion_score,
-                'overall_rating': rating,
-                'note': 'Evaluation based on interview completion - transcriptions not available'
-            }
-            
-            # Save mock evaluation
-            candidate.evaluation_score = str(completion_score)
-            candidate.evaluation_rating = rating
-            candidate.evaluation_data = {
-                'summary': summary,
-                'evaluated_at': datetime.utcnow().isoformat(),
-                'evaluation_type': 'completion_based'
-            }
-            candidate.evaluation_timestamp = datetime.utcnow()
-            candidate.save()
-            
-            return Response({
-                'success': True,
-                'candidate_id': candidate_id,
-                'evaluation_summary': summary,
-                'candidate': CandidateSerializer(candidate).data,
-                'message': 'Evaluation completed based on interview participation'
-            }, status=status.HTTP_200_OK)
+            print(f"   ❌ No valid transcriptions found - candidate needs to complete proper interview")
+            return Response(
+                {
+                    'error': 'No valid interview responses found',
+                    'message': 'Candidate needs to complete interview with proper transcriptions to get evaluation'
+                }, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        print(f"   🧠 Processing AI-based evaluation with {len(valid_transcriptions)} Q&A pairs...")
         
         # Process evaluations with valid transcriptions
         results = []
@@ -1410,12 +1093,18 @@ def manual_evaluate_candidate(request):
             question = evaluation['question']
             answer = evaluation['answer']
             
+            print(f"   📝 Evaluating Q&A {idx+1}/{len(valid_transcriptions)}")
+            
             try:
                 evaluation_result = eval_function(question, answer, resume_content)
                 
                 if not evaluation_result.get('error'):
-                    total_score += evaluation_result.get('overall_score', 0)
+                    score = evaluation_result.get('overall_score', 0)
+                    total_score += score
                     successful_evaluations += 1
+                    print(f"      ✅ Score: {score}")
+                else:
+                    print(f"      ❌ Evaluation error: {evaluation_result.get('error')}")
                 
                 results.append({
                     'index': idx,
@@ -1424,6 +1113,7 @@ def manual_evaluate_candidate(request):
                 })
                 
             except Exception as e:
+                print(f"      ❌ Exception during evaluation: {e}")
                 results.append({
                     'index': idx,
                     'error': f'Evaluation failed: {str(e)}',
@@ -1432,6 +1122,11 @@ def manual_evaluate_candidate(request):
         
         # Calculate summary
         average_score = total_score / successful_evaluations if successful_evaluations > 0 else 0
+        
+        print(f"   📊 Final Results:")
+        print(f"      Total Score: {total_score}")
+        print(f"      Successful Evaluations: {successful_evaluations}")
+        print(f"      Average Score: {average_score}")
         
         # Determine rating based on average score
         if average_score >= 8:
@@ -1442,6 +1137,8 @@ def manual_evaluate_candidate(request):
             overall_rating = 'Average'
         else:
             overall_rating = 'Needs Improvement'
+        
+        print(f"      Overall Rating: {overall_rating}")
         
         summary = {
             'total_questions': len(candidate.audio_responses),

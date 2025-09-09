@@ -5,7 +5,7 @@ from django.contrib.auth.models import User
 
 class Candidate(Document):
     candidate_id = StringField(max_length=100, unique=True, default=lambda: str(uuid.uuid4()))
-    email = EmailField(unique=True, required=True)
+    email = EmailField(required=True)  # Removed unique=True to allow same email for different recruiters
     created_by_id = StringField(max_length=100, required=True)  # Store user ID as string
     created_at = DateTimeField(default=datetime.utcnow)
     updated_at = DateTimeField(default=datetime.utcnow)
@@ -28,6 +28,10 @@ class Candidate(Document):
     # Evaluation results
     evaluation_score = StringField(max_length=10)  # Overall score (e.g., "8.5")
     evaluation_rating = StringField(max_length=50)  # Overall rating (e.g., "Excellent", "Good")
+    
+    # Note: Uniqueness is handled at application level in views.py
+    # Different recruiters can invite the same candidate
+    # Same recruiter cannot invite same candidate twice
     evaluation_data = DictField()  # Store complete evaluation results
     evaluation_timestamp = DateTimeField()  # When evaluation was completed
     
