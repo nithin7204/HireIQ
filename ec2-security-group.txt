@@ -1,0 +1,15 @@
+# EC2 Security Group Configuration for HireIQ
+
+# Required Inbound Rules:
+# Type        Protocol    Port Range    Source        Description
+# SSH         TCP         22           Your IP        SSH access
+# HTTP        TCP         80           0.0.0.0/0      Frontend access
+# HTTPS       TCP         443          0.0.0.0/0      Secure frontend access
+# Custom TCP  TCP         8000         0.0.0.0/0      Backend API access
+# Custom TCP  TCP         27017        10.0.0.0/8     MongoDB (internal only)
+# Custom TCP  TCP         6379         10.0.0.0/8     Redis (internal only)
+
+# To configure via AWS CLI:
+# aws ec2 authorize-security-group-ingress --group-id sg-your-group-id --protocol tcp --port 80 --cidr 0.0.0.0/0
+# aws ec2 authorize-security-group-ingress --group-id sg-your-group-id --protocol tcp --port 443 --cidr 0.0.0.0/0
+# aws ec2 authorize-security-group-ingress --group-id sg-your-group-id --protocol tcp --port 8000 --cidr 0.0.0.0/0

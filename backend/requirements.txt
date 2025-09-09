@@ -2,6 +2,7 @@
 Django==5.2.6
 djangorestframework==3.16.1
 django-cors-headers==4.7.0
+django-redis==5.4.0
 
 # Database - MongoDB
 mongoengine==0.28.2

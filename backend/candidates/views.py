@@ -12,10 +12,36 @@ from datetime import datetime
 import os
 import uuid
 from datetime import datetime
+import gridfs
+import pymongo
 from .models import Candidate
 from .serializers import CandidateSerializer, CandidateCreateSerializer
 from candidates.ml_models.voiceToText import transcribe_audio
 from candidates.ml_models.evaluate import evaluate_candidate_answer as eval_function
+
+# MongoDB connection helper
+def get_mongodb_connection():
+    """Get MongoDB database connection for GridFS operations"""
+    try:
+        mongodb_url = os.getenv('MONGODB_URL')
+        mongodb_name = os.getenv('MONGODB_NAME', 'hireiq_db')
+        
+        if not mongodb_url:
+            # Fallback to localhost if no URL provided
+            mongodb_url = 'mongodb://localhost:27017/'
+        
+        # Replace <db_password> placeholder with actual password if needed
+        if '<db_password>' in mongodb_url:
+            db_password = os.getenv('MONGODB_PASSWORD')
+            if db_password:
+                mongodb_url = mongodb_url.replace('<db_password>', db_password)
+        
+        client = pymongo.MongoClient(mongodb_url)
+        db = client[mongodb_name]
+        return db
+    except Exception as e:
+        print(f"Error connecting to MongoDB: {e}")
+        return None
 
 class CandidateListCreateView(generics.ListCreateAPIView):
     permission_classes = [IsAuthenticated]
@@ -79,18 +105,64 @@ class CandidateListCreateView(generics.ListCreateAPIView):
                 candidate = serializer.save()
                 
                 # Send email to candidate with their ID
-                subject = 'Your HireIQ Candidate ID'
+                company_name = serializer.validated_data.get('company', 'Our Organization')
+                role_name = serializer.validated_data.get('role', 'the position')
+                
+                subject = f'🚀 Interview Invitation - {role_name} at {company_name}'
                 message = f'''
 Dear Candidate,
 
-You have been invited to participate in the HireIQ interview process.
+We are delighted to invite you to participate in our AI-powered technical interview process for {role_name} at {company_name}.
 
-Your Candidate ID is: {candidate.candidate_id}
+📋 YOUR INTERVIEW DETAILS:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🔐 Candidate ID: {candidate.candidate_id}
+🎯 Position: {role_name}
+🏢 Company: {company_name}
+🌐 Interview Portal: http://localhost:3000/candidate
 
-Please use this ID to access the interview portal at: http://localhost:3000/candidate
+✨ WHAT TO EXPECT:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+• AI-powered personalized interview experience
+• Technical questions tailored to your background
+• Resume-based intelligent question generation  
+• Voice-enabled interview interface
+• Comprehensive skill assessment
+• Duration: 15-20 minutes
+
+📝 PREPARATION TIPS:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+✓ Ensure you have your updated resume ready (PDF format)
+✓ Test your microphone and speakers beforehand
+✓ Find a quiet, well-lit environment
+✓ Have a stable internet connection
+✓ Keep your Candidate ID handy: {candidate.candidate_id}
+
+🔗 GETTING STARTED:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+1. Visit: http://localhost:3000/candidate
+2. Enter your Candidate ID: {candidate.candidate_id}
+3. Upload your resume
+4. Begin your AI interview
+
+⚡ NEXT STEPS:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+• Complete your interview at your convenience
+• Our AI will evaluate your responses in real-time
+• Results will be shared within 3-5 business days
+• You'll receive detailed feedback on your performance
+
+Need assistance? Simply reply to this email and our team will be happy to help.
+
+We look forward to learning more about your technical expertise!
 
 Best regards,
-HireIQ Team
+The HireIQ Team
+{company_name}
+
+──────────────────────────────────────────────────
+🤖 Powered by HireIQ - Next-Generation AI Recruitment
+This is an automated message from our AI-powered recruitment platform.
                 '''
                 
                 try:
@@ -1174,5 +1246,149 @@ def manual_evaluate_candidate(request):
         traceback.print_exc()
         return Response(
             {'error': f'Server error: {str(e)}'}, 
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_detailed_report(request, candidate_id):
+    """
+    Get detailed AI evaluation report for a candidate
+    """
+    try:
+        print(f"\n📊 Fetching detailed report for candidate: {candidate_id}")
+        
+        # Get the candidate
+        user = request.user
+        candidate = Candidate.objects.filter(
+            candidate_id=candidate_id,
+            recruited_by_email=user.email
+        ).first()
+        
+        if not candidate:
+            return Response(
+                {'error': 'Candidate not found or access denied'}, 
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        # Check if candidate has evaluation data
+        if not candidate.interview_score or candidate.interview_score == 0:
+            return Response(
+                {'error': 'No evaluation data available. Please run evaluation first.'}, 
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        # Prepare detailed report data
+        report_data = {
+            'candidate_id': candidate.candidate_id,
+            'email': candidate.email,
+            'interview_score': candidate.interview_score,
+            'evaluation_rating': candidate.evaluation_rating,
+            'evaluation_score': candidate.evaluation_score,
+            'evaluation_timestamp': candidate.evaluation_timestamp,
+            'company': candidate.company,
+            'role': candidate.role,
+        }
+        
+        # Add evaluation data if available
+        if hasattr(candidate, 'evaluation_data') and candidate.evaluation_data:
+            evaluation_data = candidate.evaluation_data
+            
+            # Extract comprehensive evaluation information
+            if isinstance(evaluation_data, dict):
+                # Parse the summary for different sections
+                summary = evaluation_data.get('summary', '')
+                
+                # Try to extract sections from the summary
+                sections = {
+                    'evaluation_summary': summary,
+                    'technical_skills': '',
+                    'strengths': '',
+                    'improvements': '',
+                }
+                
+                # Simple parsing to extract sections from the summary
+                if 'Technical Skills:' in summary:
+                    parts = summary.split('Technical Skills:')
+                    if len(parts) > 1:
+                        tech_part = parts[1]
+                        if 'Strengths:' in tech_part:
+                            tech_skills = tech_part.split('Strengths:')[0].strip()
+                            sections['technical_skills'] = tech_skills
+                        else:
+                            sections['technical_skills'] = tech_part.strip()
+                
+                if 'Strengths:' in summary:
+                    parts = summary.split('Strengths:')
+                    if len(parts) > 1:
+                        strength_part = parts[1]
+                        if 'Areas for Improvement:' in strength_part:
+                            strengths = strength_part.split('Areas for Improvement:')[0].strip()
+                            sections['strengths'] = strengths
+                        else:
+                            sections['strengths'] = strength_part.strip()
+                
+                if 'Areas for Improvement:' in summary:
+                    parts = summary.split('Areas for Improvement:')
+                    if len(parts) > 1:
+                        improvements = parts[1].strip()
+                        sections['improvements'] = improvements
+                
+                report_data.update(sections)
+                report_data['evaluation_results'] = evaluation_data.get('results', [])
+        
+        # Get audio responses for transcript
+        try:
+            db = get_mongodb_connection()
+            if db is None:
+                print("Warning: Could not connect to MongoDB for audio responses")
+                report_data['responses'] = []
+            else:
+                fs = gridfs.GridFS(db)
+                audio_responses = []
+                
+                # Find audio responses for this candidate
+                audio_files = fs.find({
+                    'candidate_id': candidate.candidate_id,
+                    'type': 'audio_response'
+                })
+                
+                for audio_file in audio_files:
+                    response_data = {
+                        'question_id': audio_file.metadata.get('question_id', ''),
+                        'question': audio_file.metadata.get('question_text', 'Question not available'),
+                        'transcribed_text': audio_file.metadata.get('transcribed_text', 'Transcription not available'),
+                        'timestamp': audio_file.upload_date,
+                    }
+                    audio_responses.append(response_data)
+                
+                report_data['responses'] = audio_responses[:5]  # Limit to 5 most recent
+            
+        except Exception as e:
+            print(f"Error fetching audio responses: {e}")
+            report_data['responses'] = []
+        
+        # Add additional insights
+        report_data.update({
+            'total_questions': len(report_data.get('responses', [])),
+            'completion_rate': '100%' if candidate.interview_score > 0 else '0%',
+            'recommendation': (
+                'Highly Recommended' if candidate.interview_score >= 80 else
+                'Recommended' if candidate.interview_score >= 60 else
+                'Consider with Reservations' if candidate.interview_score >= 40 else
+                'Not Recommended'
+            )
+        })
+        
+        print(f"✅ Detailed report generated successfully for {candidate.email}")
+        return Response(report_data, status=status.HTTP_200_OK)
+        
+    except Exception as e:
+        print(f"❌ Error generating detailed report: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return Response(
+            {'error': f'Failed to generate report: {str(e)}'}, 
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )

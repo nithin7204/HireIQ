@@ -8,7 +8,8 @@ from .views import (
     get_candidate_questions,
     transcribe_audio_view,
     save_audio_response,
-    manual_evaluate_candidate
+    manual_evaluate_candidate,
+    get_detailed_report
 )
 
 urlpatterns = [
@@ -21,4 +22,5 @@ urlpatterns = [
     path('transcribe-audio/', transcribe_audio_view, name='transcribe-audio'),
     path('save-audio-response/', save_audio_response, name='save-audio-response'),
     path('manual-evaluate/', manual_evaluate_candidate, name='manual-evaluate-candidate'),
+    path('detailed-report/<str:candidate_id>/', get_detailed_report, name='detailed-report'),
 ]
