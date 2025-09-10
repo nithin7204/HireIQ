@@ -208,6 +208,29 @@ def validate_candidate_id(request):
     
     try:
         candidate = Candidate.objects.get(candidate_id=candidate_id, is_active=True)
+        
+        # Check if interview has been terminated due to violations
+        if candidate.interview_terminated:
+            return Response(
+                {
+                    'valid': False, 
+                    'error': f'Interview access has been revoked. Reason: {candidate.termination_reason or "Security violation"}',
+                    'terminated': True
+                }, 
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        # Check if interview has already been completed
+        if candidate.interview_completed:
+            return Response(
+                {
+                    'valid': False, 
+                    'error': 'You have already completed this interview. Multiple attempts are not allowed.',
+                    'completed': True
+                }, 
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
         return Response(
             {'valid': True, 'candidate': CandidateSerializer(candidate).data}, 
             status=status.HTTP_200_OK
@@ -465,6 +488,20 @@ def auto_generate_questions(request):
         # Get candidate
         candidate = Candidate.objects.get(candidate_id=candidate_id, is_active=True)
         
+        # Check if interview has been terminated
+        if candidate.interview_terminated:
+            return Response({
+                'error': f'Interview access has been revoked. Reason: {candidate.termination_reason or "Security violation"}',
+                'terminated': True
+            }, status=status.HTTP_403_FORBIDDEN)
+        
+        # Check if interview has already been completed
+        if candidate.interview_completed:
+            return Response({
+                'error': 'You have already completed this interview. Multiple attempts are not allowed.',
+                'completed': True
+            }, status=status.HTTP_403_FORBIDDEN)
+        
         if not candidate.resume_data:
             return Response(
                 {'error': 'No resume found for this candidate'}, 
@@ -515,6 +552,12 @@ def auto_generate_questions(request):
         if not candidate.hr_prompt or not candidate.hr_prompt.strip():
             candidate.hr_prompt = hr_instructions
         candidate.interview_questions = questions
+        
+        # Mark interview as started when questions are generated for the first time
+        if not candidate.interview_started:
+            candidate.interview_started = True
+            candidate.interview_start_time = datetime.utcnow()
+        
         candidate.save()
         
         return Response({
@@ -1263,7 +1306,7 @@ def get_detailed_report(request, candidate_id):
         user = request.user
         candidate = Candidate.objects.filter(
             candidate_id=candidate_id,
-            recruited_by_email=user.email
+            created_by_id=str(user.id)
         ).first()
         
         if not candidate:
@@ -1273,17 +1316,29 @@ def get_detailed_report(request, candidate_id):
             )
         
         # Check if candidate has evaluation data
-        if not candidate.interview_score or candidate.interview_score == 0:
+        if not candidate.evaluation_score:
             return Response(
                 {'error': 'No evaluation data available. Please run evaluation first.'}, 
                 status=status.HTTP_404_NOT_FOUND
             )
         
+        # Calculate interview score from evaluation score
+        def get_interview_score(evaluation_score):
+            if evaluation_score:
+                try:
+                    score = float(evaluation_score)
+                    return min(100, max(0, score * 10))  # Convert to 100-point scale
+                except (ValueError, TypeError):
+                    return None
+            return None
+        
+        interview_score = get_interview_score(candidate.evaluation_score)
+        
         # Prepare detailed report data
         report_data = {
             'candidate_id': candidate.candidate_id,
             'email': candidate.email,
-            'interview_score': candidate.interview_score,
+            'interview_score': interview_score,
             'evaluation_rating': candidate.evaluation_rating,
             'evaluation_score': candidate.evaluation_score,
             'evaluation_timestamp': candidate.evaluation_timestamp,
@@ -1336,7 +1391,43 @@ def get_detailed_report(request, candidate_id):
                         sections['improvements'] = improvements
                 
                 report_data.update(sections)
-                report_data['evaluation_results'] = evaluation_data.get('results', [])
+                
+                # Get evaluation results - check both 'results' and 'evaluation_results'
+                evaluation_results = evaluation_data.get('results', []) or evaluation_data.get('evaluation_results', [])
+                report_data['evaluation_results'] = evaluation_results
+                
+                # If we don't have summary sections but have evaluation_results, generate them
+                if not sections.get('evaluation_summary') and evaluation_results:
+                    # Generate summary sections from evaluation_results
+                    all_feedback = []
+                    all_strengths = []
+                    all_improvements = []
+                    
+                    for result in evaluation_results:
+                        if isinstance(result, dict):
+                            feedback = result.get('feedback', '')
+                            strengths = result.get('strengths', '')
+                            improvements = result.get('areas_for_improvement', '')
+                            
+                            if feedback:
+                                all_feedback.append(feedback)
+                            if strengths and strengths.lower() not in ['none', 'none demonstrated', 'none demonstrated.']:
+                                all_strengths.append(strengths)
+                            if improvements:
+                                all_improvements.append(improvements)
+                    
+                    # Update sections with generated content
+                    if all_feedback:
+                        sections['evaluation_summary'] = '\n\n'.join(all_feedback)
+                        report_data['evaluation_summary'] = sections['evaluation_summary']
+                    
+                    if all_strengths:
+                        sections['strengths'] = '\n\n'.join(all_strengths)
+                        report_data['strengths'] = sections['strengths']
+                    
+                    if all_improvements:
+                        sections['improvements'] = '\n\n'.join(all_improvements)
+                        report_data['improvements'] = sections['improvements']
         
         # Get audio responses for transcript
         try:
@@ -1372,11 +1463,11 @@ def get_detailed_report(request, candidate_id):
         # Add additional insights
         report_data.update({
             'total_questions': len(report_data.get('responses', [])),
-            'completion_rate': '100%' if candidate.interview_score > 0 else '0%',
+            'completion_rate': '100%' if interview_score and interview_score > 0 else '0%',
             'recommendation': (
-                'Highly Recommended' if candidate.interview_score >= 80 else
-                'Recommended' if candidate.interview_score >= 60 else
-                'Consider with Reservations' if candidate.interview_score >= 40 else
+                'Highly Recommended' if interview_score and interview_score >= 80 else
+                'Recommended' if interview_score and interview_score >= 60 else
+                'Consider with Reservations' if interview_score and interview_score >= 40 else
                 'Not Recommended'
             )
         })
@@ -1390,5 +1481,195 @@ def get_detailed_report(request, candidate_id):
         traceback.print_exc()
         return Response(
             {'error': f'Failed to generate report: {str(e)}'}, 
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+@api_view(['POST'])
+@permission_classes([])
+def start_interview(request):
+    """
+    Mark the interview as started and record the start time.
+    This prevents multiple attempts at the same interview.
+    """
+    candidate_id = request.data.get('candidate_id')
+    
+    if not candidate_id:
+        return Response(
+            {'error': 'Candidate ID is required'}, 
+            status=status.HTTP_400_BAD_REQUEST
+        )
+    
+    try:
+        candidate = Candidate.objects.get(candidate_id=candidate_id, is_active=True)
+        
+        # Check if interview has been terminated
+        if candidate.interview_terminated:
+            return Response(
+                {
+                    'error': f'Interview access has been revoked. Reason: {candidate.termination_reason or "Security violation"}',
+                    'terminated': True
+                }, 
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        # Check if interview has already been completed
+        if candidate.interview_completed:
+            return Response(
+                {
+                    'error': 'You have already completed this interview. Multiple attempts are not allowed.',
+                    'completed': True
+                }, 
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        # Check if interview has already been started
+        if candidate.interview_started:
+            return Response(
+                {
+                    'error': 'Interview has already been started. You cannot restart the interview.',
+                    'started': True
+                }, 
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        # Mark interview as started
+        candidate.interview_started = True
+        candidate.interview_start_time = datetime.utcnow()
+        candidate.save()
+        
+        return Response(
+            {
+                'message': 'Interview started successfully',
+                'interview_start_time': candidate.interview_start_time,
+                'candidate': CandidateSerializer(candidate).data
+            }, 
+            status=status.HTTP_200_OK
+        )
+        
+    except DoesNotExist:
+        return Response(
+            {'error': 'Invalid candidate ID'}, 
+            status=status.HTTP_404_NOT_FOUND
+        )
+    except Exception as e:
+        return Response(
+            {'error': f'Failed to start interview: {str(e)}'}, 
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+@api_view(['POST'])
+@permission_classes([])
+def complete_interview(request):
+    """
+    Mark the interview as completed.
+    """
+    candidate_id = request.data.get('candidate_id')
+    
+    if not candidate_id:
+        return Response(
+            {'error': 'Candidate ID is required'}, 
+            status=status.HTTP_400_BAD_REQUEST
+        )
+    
+    try:
+        candidate = Candidate.objects.get(candidate_id=candidate_id, is_active=True)
+        
+        # Check if interview has been terminated
+        if candidate.interview_terminated:
+            return Response(
+                {
+                    'error': f'Interview access has been revoked. Reason: {candidate.termination_reason or "Security violation"}',
+                    'terminated': True
+                }, 
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        # Check if interview hasn't been started
+        if not candidate.interview_started:
+            return Response(
+                {
+                    'error': 'Interview has not been started yet.',
+                    'not_started': True
+                }, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Check if interview has already been completed
+        if candidate.interview_completed:
+            return Response(
+                {
+                    'message': 'Interview has already been completed.',
+                    'already_completed': True
+                }, 
+                status=status.HTTP_200_OK
+            )
+        
+        # Mark interview as completed
+        candidate.interview_completed = True
+        candidate.interview_completion_time = datetime.utcnow()
+        candidate.save()
+        
+        return Response(
+            {
+                'message': 'Interview completed successfully',
+                'interview_completion_time': candidate.interview_completion_time,
+                'candidate': CandidateSerializer(candidate).data
+            }, 
+            status=status.HTTP_200_OK
+        )
+        
+    except DoesNotExist:
+        return Response(
+            {'error': 'Invalid candidate ID'}, 
+            status=status.HTTP_404_NOT_FOUND
+        )
+    except Exception as e:
+        return Response(
+            {'error': f'Failed to complete interview: {str(e)}'}, 
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+@api_view(['POST'])
+@permission_classes([])
+def terminate_interview(request):
+    """
+    Terminate the interview due to security violations (tab switch, window switch, etc.)
+    """
+    candidate_id = request.data.get('candidate_id')
+    reason = request.data.get('reason', 'Security violation detected')
+    
+    if not candidate_id:
+        return Response(
+            {'error': 'Candidate ID is required'}, 
+            status=status.HTTP_400_BAD_REQUEST
+        )
+    
+    try:
+        candidate = Candidate.objects.get(candidate_id=candidate_id, is_active=True)
+        
+        # Mark interview as terminated
+        candidate.interview_terminated = True
+        candidate.termination_reason = reason
+        candidate.interview_completed = True  # Also mark as completed to prevent restart
+        candidate.interview_completion_time = datetime.utcnow()
+        candidate.save()
+        
+        return Response(
+            {
+                'message': 'Interview terminated due to security violation',
+                'reason': reason,
+                'terminated': True
+            }, 
+            status=status.HTTP_200_OK
+        )
+        
+    except DoesNotExist:
+        return Response(
+            {'error': 'Invalid candidate ID'}, 
+            status=status.HTTP_404_NOT_FOUND
+        )
+    except Exception as e:
+        return Response(
+            {'error': f'Failed to terminate interview: {str(e)}'}, 
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )

@@ -9,7 +9,10 @@ from .views import (
     transcribe_audio_view,
     save_audio_response,
     manual_evaluate_candidate,
-    get_detailed_report
+    get_detailed_report,
+    start_interview,
+    complete_interview,
+    terminate_interview
 )
 
 urlpatterns = [
@@ -23,4 +26,7 @@ urlpatterns = [
     path('save-audio-response/', save_audio_response, name='save-audio-response'),
     path('manual-evaluate/', manual_evaluate_candidate, name='manual-evaluate-candidate'),
     path('detailed-report/<str:candidate_id>/', get_detailed_report, name='detailed-report'),
+    path('start-interview/', start_interview, name='start-interview'),
+    path('complete-interview/', complete_interview, name='complete-interview'),
+    path('terminate-interview/', terminate_interview, name='terminate-interview'),
 ]

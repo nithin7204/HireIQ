@@ -46,6 +46,15 @@ const CandidateAccess: React.FC = () => {
       console.error('Validation failed:', error);
       if (error.response?.status === 404) {
         setMessage('Invalid candidate ID. Please check your ID and try again.');
+      } else if (error.response?.status === 403) {
+        const data = error.response.data;
+        if (data.completed) {
+          setMessage('You have already completed this interview. Multiple attempts are not allowed.');
+        } else if (data.terminated) {
+          setMessage(data.error || 'Interview access has been revoked due to security violations.');
+        } else {
+          setMessage(data.error || 'Access denied. Please contact support.');
+        }
       } else {
         setMessage('Something went wrong. Please try again later.');
       }
@@ -82,7 +91,7 @@ const CandidateAccess: React.FC = () => {
         <div className="absolute bottom-1/4 right-1/3 w-80 h-80 bg-gradient-to-r from-purple-400/20 to-pink-400/20 dark:from-purple-300/10 dark:to-pink-300/10 rounded-full blur-3xl"></div>
       </div>
 
-      <div className="relative bg-white/80 dark:bg-gray-800/80 backdrop-blur-xl rounded-3xl shadow-2xl p-10 max-w-md w-full border border-white/20 dark:border-gray-700/30">
+      <div className="relative bg-surface-white/95 dark:bg-gray-800/80 backdrop-blur-premium rounded-3xl shadow-elevated border border-professional-400/10 p-10 max-w-md w-full transition-all duration-300">
         {/* Header */}
         <div className="text-center mb-8">
           <div className="flex justify-center mb-6">
@@ -132,7 +141,7 @@ const CandidateAccess: React.FC = () => {
                 value={candidateId}
                 onChange={(e) => setCandidateId(e.target.value)}
                 placeholder="Enter your unique candidate ID"
-                className="w-full px-4 py-4 pl-12 rounded-2xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all duration-200 placeholder-gray-400 dark:placeholder-gray-500"
+                className="w-full px-4 py-4 pl-12 rounded-2xl border border-professional-400/30 dark:border-gray-600 bg-surface-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all duration-300 placeholder-gray-400 dark:placeholder-gray-500 shadow-sm hover:shadow-premium"
                 required
               />
               <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">

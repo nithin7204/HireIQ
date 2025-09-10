@@ -35,6 +35,14 @@ class Candidate(Document):
     evaluation_data = DictField()  # Store complete evaluation results
     evaluation_timestamp = DateTimeField()  # When evaluation was completed
     
+    # Interview state tracking
+    interview_started = BooleanField(default=False)  # Track if interview has been started
+    interview_start_time = DateTimeField()  # When the interview was first started
+    interview_completed = BooleanField(default=False)  # Track if interview has been completed
+    interview_completion_time = DateTimeField()  # When the interview was completed
+    interview_terminated = BooleanField(default=False)  # Track if interview was terminated due to violations
+    termination_reason = StringField(max_length=255)  # Reason for termination
+    
     meta = {
         'collection': 'candidates',
         'ordering': ['-created_at'],

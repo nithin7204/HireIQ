@@ -476,7 +476,7 @@ const RecruiterDashboard: React.FC = () => {
           <div className="absolute bottom-0 right-1/4 w-80 h-80 bg-gradient-to-r from-purple-400/20 to-pink-400/20 dark:from-purple-300/10 dark:to-pink-300/10 rounded-full blur-3xl"></div>
         </div>
 
-        <div className="relative bg-white/80 dark:bg-gray-800/80 backdrop-blur-xl rounded-3xl shadow-2xl p-10 max-w-md w-full border border-white/20 dark:border-gray-700/30">
+        <div className="relative bg-surface-white/95 dark:bg-gray-800/80 backdrop-blur-premium rounded-3xl shadow-elevated border border-professional-400/10 p-10 max-w-md w-full transition-all duration-300">
           {/* Header */}
           <div className="text-center mb-8">
             <div className="flex justify-center mb-6">
@@ -584,7 +584,7 @@ const RecruiterDashboard: React.FC = () => {
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 transition-colors duration-300">
       {/* Header */}
-      <header className="bg-white dark:bg-gray-900 shadow-sm sticky top-0 z-50 border-b border-gray-200 dark:border-gray-800 transition-colors duration-300">
+      <header className="bg-white dark:bg-gray-800 shadow-premium sticky top-0 z-50 border-b border-gray-200 dark:border-gray-700 transition-colors duration-300 backdrop-blur-premium">
         <div className="max-w-7xl mx-auto px-6 sm:px-8 lg:px-12">
           <div className="flex justify-between items-center py-5">
             <div className="flex items-center space-x-5">
@@ -682,7 +682,7 @@ const RecruiterDashboard: React.FC = () => {
 
         {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
-          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 shadow-sm border border-gray-200 dark:border-gray-700 hover:shadow-md transition-shadow duration-200">
+          <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-premium border border-gray-200 dark:border-gray-700 hover:shadow-elevated transition-all duration-300 backdrop-blur-xs">
             <div className="flex items-center">
               <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-3">
                 <svg className="w-6 h-6 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
@@ -696,7 +696,7 @@ const RecruiterDashboard: React.FC = () => {
             </div>
           </div>
 
-          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 shadow-sm border border-gray-200 dark:border-gray-700 hover:shadow-md transition-shadow duration-200">
+          <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-premium border border-gray-200 dark:border-gray-700 hover:shadow-elevated transition-all duration-300 backdrop-blur-xs">
             <div className="flex items-center">
               <div className="bg-green-50 dark:bg-green-900/20 rounded-lg p-3">
                 <svg className="w-6 h-6 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
@@ -710,7 +710,7 @@ const RecruiterDashboard: React.FC = () => {
             </div>
           </div>
 
-          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 shadow-sm border border-gray-200 dark:border-gray-700 hover:shadow-md transition-shadow duration-200">
+          <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-premium border border-gray-200 dark:border-gray-700 hover:shadow-elevated transition-all duration-300 backdrop-blur-xs">
             <div className="flex items-center">
               <div className="bg-yellow-50 dark:bg-yellow-900/20 rounded-lg p-3">
                 <svg className="w-6 h-6 text-yellow-600 dark:text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
@@ -724,7 +724,7 @@ const RecruiterDashboard: React.FC = () => {
             </div>
           </div>
 
-          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 shadow-sm border border-gray-200 dark:border-gray-700 hover:shadow-md transition-shadow duration-200">
+          <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-premium border border-gray-200 dark:border-gray-700 hover:shadow-elevated transition-all duration-300 backdrop-blur-xs">
             <div className="flex items-center">
               <div className="bg-purple-50 dark:bg-purple-900/20 rounded-lg p-3">
                 <svg className="w-6 h-6 text-purple-600 dark:text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
@@ -739,61 +739,95 @@ const RecruiterDashboard: React.FC = () => {
           </div>
         </div>
 
-        {/* Add New Candidate Card */}
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 mb-8">
-          <div className="p-8">
-            <div className="flex items-center mb-6">
-              <div className="bg-gradient-to-r from-blue-600 to-indigo-600 rounded-lg p-3 shadow-sm">
-                <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M18 7.5v3m0 0v3m0-3h3m-3 0h-3m-2.25-4.125a3.375 3.375 0 1 1-6.75 0 3.375 3.375 0 0 1 6.75 0ZM3 19.235v-.11a6.375 6.375 0 0 1 12.75 0v.109A12.318 12.318 0 0 1 9.374 21c-2.331 0-4.512-.645-6.374-1.766Z" />
-                </svg>
+        {/* Add New Candidate Card - Professional Redesign */}
+        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-elevated border border-gray-200 dark:border-gray-700 mb-10 backdrop-blur-premium overflow-hidden">
+          {/* Header Section with Premium Gradient */}
+          <div className="bg-gradient-to-r from-accent-600 via-accent-500 to-indigo-600 dark:from-accent-600 dark:via-accent-500 dark:to-indigo-600 p-8 relative overflow-hidden">
+            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent"></div>
+            <div className="relative flex items-center justify-between">
+              <div className="flex items-center space-x-4">
+                <div className="bg-white/20 dark:bg-white/20 backdrop-blur-sm rounded-2xl p-4 shadow-lg">
+                  <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M18 7.5v3m0 0v3m0-3h3m-3 0h-3m-2.25-4.125a3.375 3.375 0 1 1-6.75 0 3.375 3.375 0 0 1 6.75 0ZM3 19.235v-.11a6.375 6.375 0 0 1 12.75 0v.109A12.318 12.318 0 0 1 9.374 21c-2.331 0-4.512-.645-6.374-1.766Z" />
+                  </svg>
+                </div>
+                <div>
+                  <h2 className="text-2xl font-bold text-white mb-1">Invite New Candidate</h2>
+                  <p className="text-white/80 text-sm font-medium">Send AI-powered interview invitation with custom parameters</p>
+                </div>
               </div>
-              <div className="ml-4">
-                <h2 className="text-xl font-bold text-gray-900 dark:text-white">Invite New Candidate</h2>
-                <p className="text-sm text-gray-600 dark:text-gray-400">Send AI-powered interview invitation to candidates</p>
+              <div className="hidden md:flex items-center space-x-2 bg-white/10 dark:bg-white/10 backdrop-blur-sm rounded-xl px-4 py-2">
+                <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
+                <span className="text-white/90 text-sm font-medium">AI Ready</span>
               </div>
             </div>
-            
-            <form onSubmit={addCandidate} className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                  <label htmlFor="candidateEmail" className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
-                    Candidate Email *
+          </div>
+
+          {/* Form Section with Professional Layout */}
+          <div className="p-8 bg-white dark:bg-gray-800">            
+            <form onSubmit={addCandidate} className="space-y-8">
+              {/* Primary Information Row */}
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div className="lg:col-span-2">
+                  <label htmlFor="candidateEmail" className="block text-sm font-semibold text-gray-700 dark:text-gray-200 mb-3 flex items-center">
+                    <svg className="w-4 h-4 mr-2 text-accent-500 dark:text-accent-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 12a4 4 0 10-8 0 4 4 0 008 0zm0 0v1.5a2.5 2.5 0 005 0V12a9 9 0 10-9 9m4.5-1.206a8.959 8.959 0 01-4.5 1.207" />
+                    </svg>
+                    Candidate Email Address *
                   </label>
-                  <input
-                    id="candidateEmail"
-                    type="email"
-                    value={newCandidateEmail}
-                    onChange={(e) => setNewCandidateEmail(e.target.value)}
-                    placeholder="Enter candidate email"
-                    className="w-full px-4 py-3 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-200"
-                    required
-                  />
+                  <div className="relative">
+                    <input
+                      id="candidateEmail"
+                      type="email"
+                      value={newCandidateEmail}
+                      onChange={(e) => setNewCandidateEmail(e.target.value)}
+                      placeholder="candidate@company.com"
+                      className="w-full px-5 py-4 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-3 focus:ring-accent-500/30 dark:focus:ring-accent-400/30 focus:border-accent-500 dark:focus:border-accent-400 transition-all duration-300 shadow-sm hover:shadow-md text-lg font-medium pl-12 placeholder-gray-500 dark:placeholder-gray-400"
+                      required
+                    />
+                    <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                      <svg className="h-5 w-5 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 12a4 4 0 10-8 0 4 4 0 008 0zm0 0v1.5a2.5 2.5 0 005 0V12a9 9 0 10-9 9m4.5-1.206a8.959 8.959 0 01-4.5 1.207" />
+                      </svg>
+                    </div>
+                  </div>
                 </div>
                 <div className="flex items-end">
                   <button
                     type="submit"
                     disabled={loading}
-                    className="w-full bg-gradient-to-r from-indigo-600 to-blue-600 text-white px-6 py-3 rounded-xl hover:from-indigo-700 hover:to-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 font-semibold"
+                    className="w-full bg-gradient-to-r from-accent-600 via-accent-500 to-indigo-600 hover:from-accent-700 hover:via-accent-600 hover:to-indigo-700 text-white px-8 py-4 rounded-xl disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300 shadow-lg hover:shadow-xl transform hover:-translate-y-1 font-semibold text-lg relative overflow-hidden group"
                   >
-                    {loading ? (
-                      <div className="flex items-center justify-center">
-                        <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
-                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                        </svg>
-                        Adding...
-                      </div>
-                    ) : (
-                      'Add Candidate'
-                    )}
+                    <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                    <div className="relative flex items-center justify-center">
+                      {loading ? (
+                        <>
+                          <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" fill="none" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                          </svg>
+                          Processing...
+                        </>
+                      ) : (
+                        <>
+                          <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                          </svg>
+                          Send Invitation
+                        </>
+                      )}
+                    </div>
                   </button>
                 </div>
               </div>
               
+              {/* Company & Role Information */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                  <label htmlFor="companyName" className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                <div className="space-y-3">
+                  <label htmlFor="companyName" className="block text-sm font-semibold text-gray-700 dark:text-gray-200 flex items-center">
+                    <svg className="w-4 h-4 mr-2 text-accent-500 dark:text-accent-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                    </svg>
                     Company Name *
                   </label>
                   <input
@@ -802,12 +836,15 @@ const RecruiterDashboard: React.FC = () => {
                     value={companyName}
                     onChange={(e) => setCompanyName(e.target.value)}
                     placeholder="Enter company name"
-                    className="w-full px-4 py-3 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-200"
+                    className="w-full px-4 py-4 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-3 focus:ring-accent-500/30 dark:focus:ring-accent-400/30 focus:border-accent-500 dark:focus:border-accent-400 transition-all duration-300 shadow-sm hover:shadow-md font-medium placeholder-gray-500 dark:placeholder-gray-400"
                     required
                   />
                 </div>
-                <div>
-                  <label htmlFor="roleName" className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                <div className="space-y-3">
+                  <label htmlFor="roleName" className="block text-sm font-semibold text-gray-700 dark:text-gray-200 flex items-center">
+                    <svg className="w-4 h-4 mr-2 text-accent-500 dark:text-accent-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2-2v2m8 0V6a2 2 0 012 2v6a2 2 0 01-2 2H6a2 2 0 01-2-2V8a2 2 0 012-2V6" />
+                    </svg>
                     Role/Position *
                   </label>
                   <input
@@ -815,31 +852,47 @@ const RecruiterDashboard: React.FC = () => {
                     id="roleName"
                     value={roleName}
                     onChange={(e) => setRoleName(e.target.value)}
-                    placeholder="Enter role/position"
-                    className="w-full px-4 py-3 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-200"
+                    placeholder="e.g. Senior Software Engineer"
+                    className="w-full px-4 py-4 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-3 focus:ring-accent-500/30 dark:focus:ring-accent-400/30 focus:border-accent-500 dark:focus:border-accent-400 transition-all duration-300 shadow-sm hover:shadow-md font-medium placeholder-gray-500 dark:placeholder-gray-400"
                     required
                   />
                 </div>
               </div>
               
-              <div>
-                <label htmlFor="hrPrompt" className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
-                  HR Instructions (Optional)
-                </label>
-                <textarea
-                  id="hrPrompt"
-                  value={hrPrompt}
-                  onChange={(e) => setHrPrompt(e.target.value)}
-                  placeholder="Enter specific instructions for the interviewer AI (e.g., focus areas, skills to assess, company-specific requirements)"
-                  rows={3}
-                  className="w-full px-4 py-3 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-200 resize-none"
-                />
-                <p className="mt-2 text-sm text-gray-500 dark:text-gray-400 flex items-center">
-                  <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                  These instructions will guide the AI interviewer to generate targeted questions for this candidate.
-                </p>
+              {/* AI Instructions Section */}
+              <div className="bg-gradient-to-br from-accent-50/50 to-indigo-50/30 dark:from-gray-700/50 dark:to-gray-600/30 rounded-xl p-6 border border-accent-200/30 dark:border-gray-600/50">
+                <div className="space-y-4">
+                  <label htmlFor="hrPrompt" className="block text-sm font-semibold text-gray-700 dark:text-gray-200 flex items-center">
+                    <svg className="w-4 h-4 mr-2 text-accent-500 dark:text-accent-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+                    </svg>
+                    AI Interview Instructions
+                    <span className="ml-2 px-2 py-1 bg-accent-100 dark:bg-accent-900/50 text-accent-700 dark:text-accent-300 text-xs rounded-full font-medium">Optional</span>
+                  </label>
+                  <textarea
+                    id="hrPrompt"
+                    value={hrPrompt}
+                    onChange={(e) => setHrPrompt(e.target.value)}
+                    placeholder="Enter specific instructions for the AI interviewer:&#10;• Focus areas (e.g., React, Node.js, leadership skills)&#10;• Technical depth required&#10;• Company-specific requirements&#10;• Assessment criteria&#10;• Question style preferences"
+                    rows={4}
+                    className="w-full px-4 py-4 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-3 focus:ring-accent-500/30 dark:focus:ring-accent-400/30 focus:border-accent-500 dark:focus:border-accent-400 transition-all duration-300 resize-none shadow-sm hover:shadow-md font-medium placeholder-gray-500 dark:placeholder-gray-400"
+                  />
+                  <div className="bg-white dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-600">
+                    <div className="flex items-start space-x-3">
+                      <div className="flex-shrink-0">
+                        <svg className="w-5 h-5 text-accent-500 dark:text-accent-400 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                      </div>
+                      <div>
+                        <h4 className="text-sm font-semibold text-gray-900 dark:text-white mb-1">AI Personalization</h4>
+                        <p className="text-sm text-gray-600 dark:text-gray-300 leading-relaxed">
+                          These instructions help our AI interviewer create targeted, role-specific questions that align with your hiring criteria and company culture.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
               </div>
             </form>
           </div>
@@ -1231,7 +1284,7 @@ const RecruiterDashboard: React.FC = () => {
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
                         </svg>
                         <h3 className="text-lg font-semibold text-red-800 dark:text-red-300 mb-2">Report Error</h3>
-                        <p className="text-red-600 dark:text-red-400">{detailedReport.error}</p>
+                        <p className="text-red-600 dark:text-red-400">{String(detailedReport.error)}</p>
                       </div>
                     ) : (
                       <>
@@ -1241,7 +1294,7 @@ const RecruiterDashboard: React.FC = () => {
                             <div>
                               <h3 className="text-xl font-bold text-blue-800 dark:text-blue-300 mb-2">Overall Assessment</h3>
                               <p className="text-blue-600 dark:text-blue-400">
-                                {detailedReport.evaluation_rating || 'Not Available'}
+                                {String(detailedReport.evaluation_rating || 'Not Available')}
                               </p>
                             </div>
                             <div className="text-right">
@@ -1264,7 +1317,7 @@ const RecruiterDashboard: React.FC = () => {
                             </h3>
                             <div className="prose prose-sm max-w-none dark:prose-invert">
                               <p className="text-gray-600 dark:text-gray-400 leading-relaxed whitespace-pre-wrap">
-                                {detailedReport.evaluation_summary}
+                                {String(detailedReport.evaluation_summary || '')}
                               </p>
                             </div>
                           </div>
@@ -1282,7 +1335,7 @@ const RecruiterDashboard: React.FC = () => {
                             </h3>
                             <div className="prose prose-sm max-w-none dark:prose-invert">
                               <p className="text-gray-600 dark:text-gray-400 leading-relaxed whitespace-pre-wrap">
-                                {detailedReport.technical_skills}
+                                {String(detailedReport.technical_skills || '')}
                               </p>
                             </div>
                           </div>
@@ -1300,7 +1353,7 @@ const RecruiterDashboard: React.FC = () => {
                               </h3>
                               <div className="prose prose-sm max-w-none">
                                 <p className="text-green-700 dark:text-green-400 leading-relaxed whitespace-pre-wrap">
-                                  {detailedReport.strengths}
+                                  {String(detailedReport.strengths || '')}
                                 </p>
                               </div>
                             </div>
@@ -1316,7 +1369,7 @@ const RecruiterDashboard: React.FC = () => {
                               </h3>
                               <div className="prose prose-sm max-w-none">
                                 <p className="text-orange-700 dark:text-orange-400 leading-relaxed whitespace-pre-wrap">
-                                  {detailedReport.improvements}
+                                  {String(detailedReport.improvements || '')}
                                 </p>
                               </div>
                             </div>
@@ -1339,10 +1392,10 @@ const RecruiterDashboard: React.FC = () => {
                                     Question {index + 1}:
                                   </h4>
                                   <p className="text-sm text-gray-600 dark:text-gray-400 mb-2 italic">
-                                    {response.question}
+                                    {String(response.question || 'Question not available')}
                                   </p>
                                   <p className="text-gray-700 dark:text-gray-300 text-sm">
-                                    {response.transcribed_text || 'Response recorded but transcription not available'}
+                                    {String(response.transcribed_text || 'Response recorded but transcription not available')}
                                   </p>
                                 </div>
                               ))}

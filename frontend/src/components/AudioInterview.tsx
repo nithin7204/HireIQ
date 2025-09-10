@@ -1,6 +1,7 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import axios from 'axios';
 import { useTheme } from '../contexts/ThemeContext';
+import useSecurityMonitor from '../hooks/useSecurityMonitor';
 
 interface Question {
   id: string;
@@ -29,6 +30,8 @@ const AudioInterview: React.FC<AudioInterviewProps> = ({ candidateId, onBackToPo
   const [hrInstructions, setHrInstructions] = useState('');
   const [showInstructions, setShowInstructions] = useState(true);
   const [instructionsRead, setInstructionsRead] = useState(false);
+  const [securityViolation, setSecurityViolation] = useState<string | null>(null);
+  const [isInterviewActive, setIsInterviewActive] = useState(false);
   const { isDarkMode, toggleDarkMode } = useTheme();
   
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -39,20 +42,35 @@ const AudioInterview: React.FC<AudioInterviewProps> = ({ candidateId, onBackToPo
 
   const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000/api';
 
-  useEffect(() => {
-    fetchQuestions();
-    return () => {
-      // Cleanup
-      if (recordingIntervalRef.current) {
-        clearInterval(recordingIntervalRef.current);
-      }
-      if (streamRef.current) {
-        streamRef.current.getTracks().forEach(track => track.stop());
-      }
-    };
-  }, []);
+  // Security monitoring
+  const handleSecurityViolation = (reason: string) => {
+    setSecurityViolation(reason);
+    setIsInterviewActive(false);
+    setError(`Interview terminated: ${reason}`);
+  };
 
-  const fetchQuestions = async () => {
+  const handleNetworkError = () => {
+    setSecurityViolation('Network connection lost');
+    setIsInterviewActive(false);
+    setError('Interview terminated due to network issues');
+  };
+
+  const { terminateInterview, pauseMonitoring, resumeMonitoring } = useSecurityMonitor({
+    candidateId,
+    isInterviewActive,
+    onSecurityViolation: handleSecurityViolation,
+    onNetworkError: handleNetworkError
+  });
+
+  // Unused variable to avoid warnings - can be used for manual termination if needed
+  console.log('Security monitor initialized', { terminateInterview });
+  
+  // Log hrInstructions for debugging if needed
+  if (hrInstructions) {
+    console.log('HR Instructions loaded:', hrInstructions.substring(0, 100) + '...');
+  }
+
+  const fetchQuestions = useCallback(async () => {
     try {
       setLoading(true);
       const response = await axios.get(`${API_BASE_URL}/candidates/questions/${candidateId}/`);
@@ -96,12 +114,45 @@ const AudioInterview: React.FC<AudioInterviewProps> = ({ candidateId, onBackToPo
     } finally {
       setLoading(false);
     }
-  };
+  }, [candidateId, API_BASE_URL]);
+
+  useEffect(() => {
+    fetchQuestions();
+    return () => {
+      // Cleanup
+      if (recordingIntervalRef.current) {
+        clearInterval(recordingIntervalRef.current);
+      }
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(track => track.stop());
+      }
+    };
+  }, [fetchQuestions]); // Now properly depends on fetchQuestions
 
   const startRecording = async () => {
     try {
+      setError(''); // Clear any previous errors
+      
+      // Start security monitoring only when user starts recording for the first time
+      if (!isInterviewActive) {
+        setIsInterviewActive(true);
+        console.log('🔒 Security monitoring activated');
+      }
+      
+      // Pause security monitoring before requesting microphone access
+      pauseMonitoring(15000); // Pause for 15 seconds max
+      
+      // Show a temporary message about microphone access
+      const tempError = error;
+      setError('Requesting microphone access... Please allow microphone permissions when prompted.');
+      
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       streamRef.current = stream;
+      
+      // Clear the permission message once granted and resume monitoring
+      setError(tempError);
+      resumeMonitoring();
+      console.log('🎤 Microphone permission granted successfully');
       
       const mediaRecorder = new MediaRecorder(stream);
       mediaRecorderRef.current = mediaRecorder;
@@ -121,15 +172,31 @@ const AudioInterview: React.FC<AudioInterviewProps> = ({ candidateId, onBackToPo
       mediaRecorder.start();
       setIsRecording(true);
       setRecordingTime(0);
+      console.log('🎙️ Recording started successfully');
       
       // Start timer
       recordingIntervalRef.current = setInterval(() => {
         setRecordingTime(prev => prev + 1);
       }, 1000);
 
-    } catch (err) {
-      console.error('Error starting recording:', err);
-      setError('Failed to access microphone. Please check permissions.');
+    } catch (err: any) {
+      console.error('❌ Error starting recording:', err);
+      console.log('🔍 Error type:', err.name);
+      console.log('🔍 Error message:', err.message);
+      
+      // Resume monitoring even if there's an error
+      resumeMonitoring();
+      
+      if (err.name === 'NotAllowedError') {
+        console.log('🚫 Microphone permission denied by user');
+        setError('Microphone access denied. Please allow microphone permissions and try again.');
+      } else if (err.name === 'NotFoundError') {
+        console.log('🔍 No microphone device found');
+        setError('No microphone found. Please check your microphone connection.');
+      } else {
+        console.log('⚠️ Unknown microphone error');
+        setError('Failed to access microphone. Please check permissions and try again.');
+      }
     }
   };
 
@@ -240,7 +307,7 @@ const AudioInterview: React.FC<AudioInterviewProps> = ({ candidateId, onBackToPo
         setRecordingTime(0);
         setError('');
       } else {
-        setInterviewCompleted(true);
+        await completeInterview();
       }
       
     } catch (err: any) {
@@ -310,6 +377,22 @@ Remember: We're looking for your thought process, not just the right answer. Goo
   const startInterview = () => {
     setShowInstructions(false);
     setInstructionsRead(true);
+    // Note: Don't start security monitoring until user starts recording
+    // setIsInterviewActive(true); // Moved to first recording attempt
+  };
+
+  const completeInterview = async () => {
+    setIsInterviewActive(false);
+    setInterviewCompleted(true);
+    
+    // Mark interview as completed on the backend
+    try {
+      await axios.post(`${API_BASE_URL}/candidates/complete-interview/`, {
+        candidate_id: candidateId
+      });
+    } catch (error) {
+      console.error('Failed to mark interview as completed:', error);
+    }
   };
 
   // Instructions Screen Component
@@ -475,6 +558,61 @@ Remember: We're looking for your thought process, not just the right answer. Goo
           >
             Back to Portal
           </button>
+        </div>
+      </div>
+    );
+  }
+
+  // Show security violation screen if interview was terminated
+  if (securityViolation) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-red-50 via-orange-50 to-yellow-50 dark:from-gray-900 dark:via-red-900/20 dark:to-orange-950 transition-colors duration-300 flex items-center justify-center p-4">
+        <div className="relative bg-white/95 dark:bg-gray-800/80 backdrop-blur-premium rounded-3xl shadow-elevated border border-red-400/20 p-10 max-w-lg w-full transition-all duration-300">
+          {/* Header */}
+          <div className="text-center mb-8">
+            <div className="flex justify-center mb-6">
+              <div className="bg-gradient-to-r from-red-600 to-orange-600 p-4 rounded-2xl shadow-lg">
+                <svg className="h-12 w-12 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                </svg>
+              </div>
+            </div>
+            <h1 className="text-4xl font-bold bg-gradient-to-r from-red-600 to-orange-600 bg-clip-text text-transparent mb-3">
+              Interview Terminated
+            </h1>
+            <p className="text-gray-600 dark:text-gray-400 text-lg">
+              Your interview has been ended due to a security violation
+            </p>
+          </div>
+
+          {/* Violation Details */}
+          <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-2xl p-6 mb-8">
+            <h3 className="text-xl font-semibold text-red-700 dark:text-red-300 mb-3">Violation Detected:</h3>
+            <p className="text-red-600 dark:text-red-400 text-lg font-medium">
+              {securityViolation}
+            </p>
+          </div>
+
+          {/* Important Notice */}
+          <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-2xl p-6 mb-8">
+            <h3 className="text-xl font-semibold text-yellow-700 dark:text-yellow-300 mb-3">Important Notice:</h3>
+            <ul className="text-yellow-600 dark:text-yellow-400 space-y-2">
+              <li>• Your interview session has been permanently terminated</li>
+              <li>• This incident has been recorded and reported</li>
+              <li>• You cannot restart or continue this interview</li>
+              <li>• Contact the recruiting team for any questions</li>
+            </ul>
+          </div>
+
+          {/* Action Button */}
+          <div className="text-center">
+            <button
+              onClick={onBackToPortal}
+              className="bg-gradient-to-r from-gray-600 to-gray-700 hover:from-gray-700 hover:to-gray-800 text-white font-semibold py-4 px-8 rounded-2xl transition-all duration-300 transform hover:scale-105 shadow-lg"
+            >
+              Exit Interview Portal
+            </button>
+          </div>
         </div>
       </div>
     );
@@ -738,6 +876,26 @@ Remember: We're looking for your thought process, not just the right answer. Goo
             </div>
           </div>
 
+          {/* Microphone Permission Notice */}
+          {!hasRecorded && !isRecording && (
+            <div className="mb-6 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+              <div className="flex items-start">
+                <svg className="w-5 h-5 text-blue-600 dark:text-blue-400 mr-3 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <div className="text-sm">
+                  <p className="text-blue-800 dark:text-blue-200 font-medium mb-1">
+                    Microphone Access Required
+                  </p>
+                  <p className="text-blue-700 dark:text-blue-300">
+                    When you click "Start Recording", your browser will ask for microphone permission. 
+                    Please allow access to continue with the interview. This is secure and your privacy is protected.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Control Buttons */}
           <div className="flex justify-center space-x-4 mb-6">
             {!isRecording ? (
@@ -882,7 +1040,7 @@ Remember: We're looking for your thought process, not just the right answer. Goo
               </button>
             ) : hasResponse ? (
               <button
-                onClick={() => setInterviewCompleted(true)}
+                onClick={() => completeInterview()}
                 className="flex items-center px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition duration-200 font-semibold shadow-lg"
               >
                 <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
