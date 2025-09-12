@@ -88,11 +88,11 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+      args:
+        - REACT_APP_API_URL=${FRONTEND_API_URL:-http://localhost:8000/api}
+        - REACT_APP_GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
     container_name: hireiq-frontend
     restart: unless-stopped
-    environment:
-      - REACT_APP_API_URL=${FRONTEND_API_URL:-http://localhost:8000/api}
-      - REACT_APP_GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
     ports:
       - "80:80"
       - "443:443"

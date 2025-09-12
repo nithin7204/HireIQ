@@ -13,7 +13,15 @@ RUN npm ci --only=production --silent
 # Copy source code
 COPY . .
 
-# Build the React app
+# Set build-time environment variables
+ARG REACT_APP_API_URL
+ARG REACT_APP_GOOGLE_CLIENT_ID
+
+# Set them as environment variables for the build
+ENV REACT_APP_API_URL=$REACT_APP_API_URL
+ENV REACT_APP_GOOGLE_CLIENT_ID=$REACT_APP_GOOGLE_CLIENT_ID
+
+# Build the React app with environment variables
 RUN npm run build
 
 # Production stage with Nginx
