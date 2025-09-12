@@ -9,39 +9,88 @@ echo "🚀 Starting HireIQ deployment on EC2..."
 
 # Update system packages
 echo "📦 Updating system packages..."
-apt-get update && apt-get upgrade -y
+sudo apt-get update && sudo apt-get upgrade -y
+
+# Install required system packages
+echo "📦 Installing required packages..."
+sudo apt-get install -y curl wget git htop vim unzip
 
 # Install Docker if not already installed
 if ! command -v docker &> /dev/null; then
     echo "🐳 Installing Docker..."
     curl -fsSL https://get.docker.com -o get-docker.sh
-    sh get-docker.sh
-    usermod -aG docker $USER
+    sudo sh get-docker.sh
+    sudo usermod -aG docker $USER
+    sudo systemctl enable docker
+    sudo systemctl start docker
 fi
 
 # Install Docker Compose if not already installed
 if ! command -v docker-compose &> /dev/null; then
     echo "🐳 Installing Docker Compose..."
-    curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
-    chmod +x /usr/local/bin/docker-compose
+    sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+    sudo chmod +x /usr/local/bin/docker-compose
 fi
 
 # Create application directory
 APP_DIR="/opt/hireiq"
-mkdir -p $APP_DIR
+echo "📁 Setting up application directory: $APP_DIR"
+sudo mkdir -p $APP_DIR
 cd $APP_DIR
+
+# Clone or copy project files (if not already present)
+if [ ! -f docker-compose.yml ]; then
+    echo "❗ Please ensure your project files are in $APP_DIR"
+    echo "You can use git clone or scp to copy your project here"
+    exit 1
+fi
 
 # Set up environment file
 echo "⚙️  Setting up environment configuration..."
 if [ ! -f .env ]; then
-    cp .env.example .env
-    echo "❗ Please edit the .env file with your production values before continuing!"
+    if [ -f .env.example ]; then
+        cp .env.example .env
+    else
+        echo "Creating .env file..."
+        cat > .env << 'EOL'
+# Django Settings
+DEBUG=False
+SECRET_KEY=your-super-secret-key-here
+ALLOWED_HOSTS=*
+
+# Database
+MONGO_USERNAME=admin
+MONGO_PASSWORD=your-mongo-password
+MONGO_DATABASE=hireiq_db
+
+# Redis
+REDIS_PASSWORD=your-redis-password
+
+# API Keys
+GROQ_API_KEY=your-groq-api-key
+GEMINI_API_KEY=your-gemini-api-key
+
+# Google OAuth
+GOOGLE_OAUTH2_KEY=your-google-oauth-key
+GOOGLE_OAUTH2_SECRET=your-google-oauth-secret
+GOOGLE_CLIENT_ID=your-google-client-id
+
+# Email Configuration
+EMAIL_HOST_USER=your-email@gmail.com
+EMAIL_HOST_PASSWORD=your-email-password
+
+# Frontend
+FRONTEND_API_URL=http://your-ec2-public-ip:8000/api
+EOL
+    fi
+    echo "❗ Please edit the .env file with your production values!"
+    echo "Run: nano .env"
     echo "Press any key to continue after editing .env file..."
     read -n 1
 fi
 
 # Set proper permissions
-chown -R $USER:$USER $APP_DIR
+sudo chown -R $USER:$USER $APP_DIR
 chmod +x deploy.sh
 
 # Start services
