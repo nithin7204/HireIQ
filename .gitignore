@@ -35,6 +35,8 @@ db.sqlite3-journal
 .env.development.local
 .env.test.local
 .env.production.local
+ec2-production.env
+*.env
 
 # Node.js
 node_modules/

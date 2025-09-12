@@ -15,7 +15,6 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y \
     build-essential \
     curl \
-    software-properties-common \
     git \
     ffmpeg \
     libsndfile1 \
@@ -24,6 +23,7 @@ RUN apt-get update && apt-get install -y \
     g++ \
     cmake \
     pkg-config \
+    libgomp1 \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements first for better caching
@@ -33,8 +33,11 @@ COPY requirements.txt .
 # Install core dependencies first
 RUN pip install --no-cache-dir --upgrade pip setuptools wheel
 
-# Install torch and other heavy ML dependencies
-RUN pip install --no-cache-dir torch==2.8.0 transformers==4.36.2 sentence-transformers==2.2.2
+# Install torch with CPU support (lighter for production)
+RUN pip install --no-cache-dir torch==2.8.0 --index-url https://download.pytorch.org/whl/cpu
+
+# Install transformers and sentence-transformers
+RUN pip install --no-cache-dir transformers==4.36.2 sentence-transformers==2.2.2
 
 # Install remaining dependencies
 RUN pip install --no-cache-dir -r requirements.txt
