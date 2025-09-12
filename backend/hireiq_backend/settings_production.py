@@ -26,15 +26,22 @@ MEDIA_URL = '/media/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 
 # CORS settings for production
-CORS_ALLOW_ALL_ORIGINS = False
-CORS_ALLOWED_ORIGINS = [
-    f"http://{host}" for host in ALLOWED_HOSTS if host not in ['localhost', '127.0.0.1']
-] + [
-    f"https://{host}" for host in ALLOWED_HOSTS if host not in ['localhost', '127.0.0.1']
-] + [
-    "http://localhost:3000",
-    "http://127.0.0.1:3000",
-]
+CORS_ALLOW_ALL_ORIGINS = os.getenv('CORS_ALLOW_ALL_ORIGINS', 'False').lower() == 'true'
+CORS_ALLOW_CREDENTIALS = os.getenv('CORS_ALLOW_CREDENTIALS', 'False').lower() == 'true'
+
+# CORS allowed origins from environment or computed from ALLOWED_HOSTS
+cors_origins_env = os.getenv('CORS_ALLOWED_ORIGINS', '')
+if cors_origins_env:
+    CORS_ALLOWED_ORIGINS = [origin.strip() for origin in cors_origins_env.split(',')]
+else:
+    CORS_ALLOWED_ORIGINS = [
+        f"http://{host}" for host in ALLOWED_HOSTS if host not in ['localhost', '127.0.0.1']
+    ] + [
+        f"https://{host}" for host in ALLOWED_HOSTS if host not in ['localhost', '127.0.0.1']
+    ] + [
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+    ]
 
 # Add HTTPS origins if SSL is enabled
 if SECURE_SSL_REDIRECT:
