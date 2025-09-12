@@ -54,9 +54,10 @@ ENV DJANGO_SETTINGS_MODULE=hireiq_backend.settings_production
 # Collect static files (only if we have a manage.py)
 RUN if [ -f "manage.py" ]; then python manage.py collectstatic --noinput --clear; fi
 
-# Create a non-root user
+# Create a non-root user and set proper permissions
 RUN adduser --disabled-password --gecos '' appuser && \
-    chown -R appuser:appuser /app
+    chown -R appuser:appuser /app && \
+    chmod -R 755 /app/logs
 USER appuser
 
 # Expose port
