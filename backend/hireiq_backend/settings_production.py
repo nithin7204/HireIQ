@@ -26,8 +26,8 @@ MEDIA_URL = '/media/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 
 # CORS settings for production
-CORS_ALLOW_ALL_ORIGINS = os.getenv('CORS_ALLOW_ALL_ORIGINS', 'False').lower() == 'true'
-CORS_ALLOW_CREDENTIALS = os.getenv('CORS_ALLOW_CREDENTIALS', 'False').lower() == 'true'
+CORS_ALLOW_ALL_ORIGINS = os.getenv('CORS_ALLOW_ALL_ORIGINS', 'True').lower() == 'true'  # Allow all for now
+CORS_ALLOW_CREDENTIALS = True  # Required for authentication
 
 # CORS allowed origins from environment or computed from ALLOWED_HOSTS
 cors_origins_env = os.getenv('CORS_ALLOWED_ORIGINS', '')
@@ -41,6 +41,8 @@ else:
     ] + [
         "http://localhost:3000",
         "http://127.0.0.1:3000",
+        "http://ec2-65-1-248-45.ap-south-1.compute.amazonaws.com",
+        "http://ec2-65-1-248-45.ap-south-1.compute.amazonaws.com:80",
     ]
 
 # Add HTTPS origins if SSL is enabled
@@ -49,9 +51,68 @@ if SECURE_SSL_REDIRECT:
         f"https://{host}" for host in ALLOWED_HOSTS
     ])
 
+# CSRF trusted origins
+CSRF_TRUSTED_ORIGINS = CORS_ALLOWED_ORIGINS.copy()
+
+# Additional CORS settings for better compatibility
+CORS_ALLOWED_ORIGIN_REGEXES = [
+    r"^https://accounts\.google\.com$",
+    r"^https://.*\.googleusercontent\.com$",
+]
+
+# Enhanced CORS headers
+CORS_ALLOW_HEADERS = [
+    'accept',
+    'accept-encoding',
+    'authorization',
+    'content-type',
+    'dnt',
+    'origin',
+    'user-agent',
+    'x-csrftoken',
+    'x-requested-with',
+    'cross-origin-opener-policy',
+    'cache-control',
+    'access-control-allow-credentials',
+    'access-control-allow-origin',
+]
+
+CORS_ALLOW_METHODS = [
+    'GET',
+    'POST',
+    'PUT',
+    'PATCH',
+    'DELETE',
+    'OPTIONS'
+]
+
+# Additional settings to handle preflight requests
+CORS_PREFLIGHT_MAX_AGE = 86400
+
 # Database connection with environment variables
 MONGODB_URL = os.getenv('MONGODB_URL')
 MONGODB_NAME = os.getenv('MONGODB_NAME', 'hireiq_db')
+
+# Google OAuth2 Settings for production
+SOCIAL_AUTH_GOOGLE_OAUTH2_KEY = os.getenv('GOOGLE_OAUTH2_KEY') or os.getenv('GOOGLE_CLIENT_ID')
+SOCIAL_AUTH_GOOGLE_OAUTH2_SECRET = os.getenv('GOOGLE_OAUTH2_SECRET') or os.getenv('GOOGLE_CLIENT_SECRET')
+
+# Update redirect URLs for EC2 deployment
+SOCIAL_AUTH_LOGIN_REDIRECT_URL = '/'
+SOCIAL_AUTH_LOGIN_ERROR_URL = '/login'
+SOCIAL_AUTH_LOGIN_URL = '/auth/login/google-oauth2/'
+
+# Ensure proper authentication backends
+AUTHENTICATION_BACKENDS = [
+    'social_core.backends.google.GoogleOAuth2',
+    'django.contrib.auth.backends.ModelBackend',
+]
+
+# Social auth settings for better security
+SOCIAL_AUTH_GOOGLE_OAUTH2_SCOPE = ['email', 'profile']
+SOCIAL_AUTH_GOOGLE_OAUTH2_USE_DEPRECATED_API = False
+SOCIAL_AUTH_RAISE_EXCEPTIONS = False
+SOCIAL_AUTH_REDIRECT_IS_HTTPS = os.getenv('SECURE_SSL_REDIRECT', 'False').lower() == 'true'
 
 # Redis cache configuration
 REDIS_URL = os.getenv('REDIS_URL', 'redis://redis:6379/0')
